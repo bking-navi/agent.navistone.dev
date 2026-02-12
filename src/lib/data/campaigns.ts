@@ -1,0 +1,198 @@
+import type { Campaign } from "@/types";
+
+export const campaigns: Campaign[] = [
+  // 2024 Campaigns
+  {
+    campaignId: "camp-001",
+    campaignName: "Q1 2024 Caribbean Prospecting",
+    campaignType: "Prospecting",
+    launchDate: "2024-01-15",
+    mailVolume: 150000,
+    adSpend: 45000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-002",
+    campaignName: "Q1 2024 Lapsed Customer Reactivation",
+    campaignType: "Reactivation",
+    launchDate: "2024-02-01",
+    mailVolume: 50000,
+    adSpend: 15000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-003",
+    campaignName: "Q1 2024 Site Abandonment Retargeting",
+    campaignType: "Retargeting",
+    launchDate: "2024-01-20",
+    mailVolume: 25000,
+    adSpend: 8000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-004",
+    campaignName: "Q2 2024 Mediterranean Launch",
+    campaignType: "Prospecting",
+    launchDate: "2024-04-01",
+    mailVolume: 120000,
+    adSpend: 38000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-005",
+    campaignName: "Q2 2024 Alaska Season Push",
+    campaignType: "Prospecting",
+    launchDate: "2024-04-15",
+    mailVolume: 100000,
+    adSpend: 32000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-006",
+    campaignName: "Q2 2024 VIP Retention",
+    campaignType: "Reactivation",
+    launchDate: "2024-05-01",
+    mailVolume: 20000,
+    adSpend: 12000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-007",
+    campaignName: "Q3 2024 Caribbean Fall Deals",
+    campaignType: "Prospecting",
+    launchDate: "2024-07-15",
+    mailVolume: 140000,
+    adSpend: 42000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-008",
+    campaignName: "Q3 2024 Email Winback",
+    campaignType: "Reactivation",
+    launchDate: "2024-08-01",
+    mailVolume: 80000,
+    adSpend: 8000,
+    channel: "Email",
+  },
+  {
+    campaignId: "camp-009",
+    campaignName: "Q3 2024 Display Retargeting",
+    campaignType: "Retargeting",
+    launchDate: "2024-07-20",
+    mailVolume: 0,
+    adSpend: 25000,
+    channel: "Display",
+  },
+  {
+    campaignId: "camp-010",
+    campaignName: "Q4 2024 Holiday Caribbean",
+    campaignType: "Prospecting",
+    launchDate: "2024-10-01",
+    mailVolume: 180000,
+    adSpend: 55000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-011",
+    campaignName: "Q4 2024 Mediterranean Reactivation",
+    campaignType: "Reactivation",
+    launchDate: "2024-10-15",
+    mailVolume: 60000,
+    adSpend: 18000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-012",
+    campaignName: "Q4 2024 Year-End Push",
+    campaignType: "Prospecting",
+    launchDate: "2024-11-15",
+    mailVolume: 200000,
+    adSpend: 62000,
+    channel: "Direct Mail",
+  },
+  // 2025 Campaigns
+  {
+    campaignId: "camp-013",
+    campaignName: "Q1 2025 New Year Caribbean",
+    campaignType: "Prospecting",
+    launchDate: "2025-01-10",
+    mailVolume: 160000,
+    adSpend: 48000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-014",
+    campaignName: "Q1 2025 Lapsed Reactivation",
+    campaignType: "Reactivation",
+    launchDate: "2025-01-25",
+    mailVolume: 55000,
+    adSpend: 16500,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-015",
+    campaignName: "Q1 2025 Alaska Early Bird",
+    campaignType: "Prospecting",
+    launchDate: "2025-02-01",
+    mailVolume: 90000,
+    adSpend: 28000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-016",
+    campaignName: "Q1 2025 Email Nurture",
+    campaignType: "Retargeting",
+    launchDate: "2025-02-15",
+    mailVolume: 100000,
+    adSpend: 10000,
+    channel: "Email",
+  },
+  {
+    campaignId: "camp-017",
+    campaignName: "Q1 2025 Europe Spring",
+    campaignType: "Prospecting",
+    launchDate: "2025-03-01",
+    mailVolume: 110000,
+    adSpend: 35000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-018",
+    campaignName: "Q1 2025 Mediterranean Suite Push",
+    campaignType: "Reactivation",
+    launchDate: "2025-03-15",
+    mailVolume: 30000,
+    adSpend: 15000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-019",
+    campaignName: "Q2 2025 Caribbean Summer",
+    campaignType: "Prospecting",
+    launchDate: "2025-04-01",
+    mailVolume: 130000,
+    adSpend: 40000,
+    channel: "Direct Mail",
+  },
+  {
+    campaignId: "camp-020",
+    campaignName: "Q2 2025 Display Brand Awareness",
+    campaignType: "Prospecting",
+    launchDate: "2025-04-15",
+    mailVolume: 0,
+    adSpend: 30000,
+    channel: "Display",
+  },
+];
+
+export function getCampaignById(campaignId: string): Campaign | undefined {
+  return campaigns.find((c) => c.campaignId === campaignId);
+}
+
+export function getCampaignsByType(type: Campaign["campaignType"]): Campaign[] {
+  return campaigns.filter((c) => c.campaignType === type);
+}
+
+export function getCampaignsByChannel(channel: Campaign["channel"]): Campaign[] {
+  return campaigns.filter((c) => c.channel === channel);
+}
