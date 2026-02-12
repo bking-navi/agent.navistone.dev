@@ -29,14 +29,6 @@ export function ChatContainer() {
     confirmed: boolean;
   }>({ open: false, action: null, confirmed: false });
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
 
   const sendMessage = async (content: string) => {
     // Add user message immediately
@@ -199,9 +191,9 @@ export function ChatContainer() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="relative h-full">
       {/* Messages area */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="h-full">
         <div className="max-w-3xl mx-auto px-4 py-6">
           {messages.length === 0 ? (
             <div className="space-y-6">
@@ -228,7 +220,7 @@ export function ChatContainer() {
               <SuggestedQuestions onSelect={sendMessage} />
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 pb-24">
               {messages.map((message) => (
                 <ChatMessage
                   key={message.id}
@@ -242,16 +234,15 @@ export function ChatContainer() {
                   <span className="text-sm animate-pulse">Analyzing your data...</span>
                 </div>
               )}
-              <div ref={scrollRef} />
             </div>
           )}
         </div>
       </ScrollArea>
 
-      {/* Input area - only show at bottom when there are messages */}
+      {/* Fixed input area at bottom of viewport */}
       {messages.length > 0 && (
-        <div className="w-full">
-          <div className="max-w-3xl mx-auto px-4 pb-4">
+        <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background to-transparent pt-6 pb-4 z-10">
+          <div className="max-w-3xl mx-auto px-4">
             {/* ml-11 = 44px to align with message content (32px avatar + 12px gap) */}
             <div className="ml-11">
               <ChatInput onSend={sendMessage} disabled={isLoading} />
