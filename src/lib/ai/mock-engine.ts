@@ -1,6 +1,8 @@
-import type { ChatMessage, QueryContext, VisualizationConfig, ActionButton, ChartDataPoint, MetricData, TableData } from "@/types";
+import type { ChatMessage, QueryContext, VisualizationConfig, ActionButton, ChartDataPoint, MetricData, TableData, AudiencePreviewData, AudienceCriteria } from "@/types";
 import * as queryEngine from "@/lib/data/query-engine";
-import { getChurnRiskCustomers, getHighValueLapsedCustomers } from "@/lib/data/query-engine";
+import { getChurnRiskCustomers, getHighValueLapsedCustomers, getFunnelData, getFunnelByCampaignType, buildAudience, calculateROIProjection, getAudienceForReactivation, getAudienceForHighValueLapsed, getAudienceForItinerary } from "@/lib/data/query-engine";
+import { generateCampaignRecommendation, generateReactivationRecommendation } from "@/lib/ai/recommendations";
+import { customers } from "@/lib/data/customers";
 
 // Natural language variation helpers
 const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -188,6 +190,80 @@ const queryPatterns: QueryPattern[] = [
       /overview/i,
     ],
     handler: handleOverallMetrics,
+  },
+  // Funnel / conversion
+  {
+    patterns: [
+      /funnel/i,
+      /conversion.*rate/i,
+      /how.*campaign.*convert/i,
+      /impression.*booking/i,
+      /conversion.*pipeline/i,
+    ],
+    handler: handleFunnel,
+  },
+  // Funnel by campaign type
+  {
+    patterns: [
+      /funnel.*(prospecting|reactivation|retargeting)/i,
+      /conversion.*(prospecting|reactivation|retargeting)/i,
+    ],
+    handler: handleFunnelByCampaignType,
+  },
+  // Audience building
+  {
+    patterns: [
+      /build.*audience/i,
+      /create.*audience/i,
+      /create.*segment/i,
+      /target.*customer/i,
+      /find.*customer/i,
+      /who.*should.*target/i,
+    ],
+    handler: handleAudienceBuilder,
+  },
+  // Audience for specific criteria
+  {
+    patterns: [
+      /audience.*(caribbean|alaska|europe|mediterranean)/i,
+      /target.*(caribbean|alaska|europe|mediterranean)/i,
+      /(caribbean|alaska|europe|mediterranean).*customer/i,
+    ],
+    handler: handleAudienceByItinerary,
+  },
+  // ROI projection
+  {
+    patterns: [
+      /roi.*projection/i,
+      /potential.*revenue/i,
+      /how much.*make/i,
+      /what.*revenue.*expect/i,
+      /project.*revenue/i,
+      /estimate.*revenue/i,
+    ],
+    handler: handleROIProjection,
+  },
+  // Campaign recommendation
+  {
+    patterns: [
+      /recommend.*campaign/i,
+      /what.*campaign/i,
+      /what.*should.*do/i,
+      /how.*target/i,
+      /suggest.*campaign/i,
+      /best.*approach/i,
+    ],
+    handler: handleCampaignRecommendation,
+  },
+  // Reactivation opportunities
+  {
+    patterns: [
+      /reactivat.*opportunit/i,
+      /win.*back/i,
+      /bring.*back/i,
+      /re-?engage/i,
+    ],
+    handler: handleReactivationOpportunity,
   },
 ];
 
@@ -585,6 +661,286 @@ function handleOverallMetrics(query: string, context: QueryContext): ChatMessage
       { id: "export-summary", label: "Export Summary", icon: "download", action: "export_csv" },
       { id: "schedule-summary", label: "Schedule Weekly Report", icon: "calendar", action: "schedule_report" },
     ]
+  );
+}
+
+// ============ FUNNEL HANDLERS ============
+
+function handleFunnel(query: string, context: QueryContext): ChatMessage {
+  const funnelData = getFunnelData();
+  const overallConversion = funnelData.length > 0 
+    ? ((funnelData[funnelData.length - 1].count / funnelData[0].count) * 100).toFixed(2)
+    : "0";
+  
+  return createMessage(
+    `Here's your campaign conversion funnel. From ${funnelData[0]?.count.toLocaleString()} impressions, you're seeing ${funnelData[1]?.count.toLocaleString()} site visits (${funnelData[0]?.conversionRate?.toFixed(1)}% visit rate) and ${funnelData[2]?.count.toLocaleString()} bookings (${overallConversion}% end-to-end conversion).\n\nThis is solid for direct mail — industry average is around 0.2-0.3% end-to-end.`,
+    {
+      type: "funnel",
+      title: "Campaign Conversion Funnel",
+      data: funnelData,
+    },
+    [
+      { id: "export-funnel", label: "Export Funnel Data", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+function handleFunnelByCampaignType(query: string, context: QueryContext): ChatMessage {
+  const normalizedQuery = query.toLowerCase();
+  
+  let campaignType: "Prospecting" | "Reactivation" | "Retargeting" = "Reactivation";
+  if (normalizedQuery.includes("prospecting")) campaignType = "Prospecting";
+  else if (normalizedQuery.includes("retargeting")) campaignType = "Retargeting";
+  
+  const funnelData = getFunnelByCampaignType(campaignType);
+  const overallConversion = funnelData.length > 0 && funnelData[0].count > 0
+    ? ((funnelData[funnelData.length - 1].count / funnelData[0].count) * 100).toFixed(2)
+    : "0";
+  
+  const insights: Record<typeof campaignType, string> = {
+    Prospecting: "Prospecting has the lowest conversion rate but brings in new customers who become repeat cruisers.",
+    Reactivation: "Reactivation campaigns convert best because you're reaching people who already know and love your brand.",
+    Retargeting: "Retargeting catches people who showed intent — they visited your site but didn't book yet.",
+  };
+  
+  return createMessage(
+    `${campaignType} funnel: ${funnelData[0]?.count.toLocaleString()} impressions → ${funnelData[1]?.count.toLocaleString()} visits → ${funnelData[2]?.count.toLocaleString()} bookings.\n\n${insights[campaignType]}\n\nEnd-to-end conversion: ${overallConversion}%`,
+    {
+      type: "funnel",
+      title: `${campaignType} Conversion Funnel`,
+      data: funnelData,
+    },
+    [
+      { id: "export-funnel-type", label: "Export Data", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+// ============ AUDIENCE BUILDER HANDLERS ============
+
+function handleAudienceBuilder(query: string, context: QueryContext): ChatMessage {
+  const normalizedQuery = query.toLowerCase();
+  
+  // Determine criteria from query
+  const criteria: AudienceCriteria = {};
+  
+  // Check for segment mentions
+  if (normalizedQuery.includes("lapsed")) {
+    criteria.segment = ["Lapsed"];
+  } else if (normalizedQuery.includes("active")) {
+    criteria.segment = ["Active"];
+  } else if (normalizedQuery.includes("vip")) {
+    criteria.segment = ["VIP"];
+  }
+  
+  // Check for loyalty tier
+  if (normalizedQuery.includes("platinum")) {
+    criteria.loyaltyTier = ["Platinum"];
+  } else if (normalizedQuery.includes("gold")) {
+    criteria.loyaltyTier = ["Gold"];
+  } else if (normalizedQuery.includes("silver")) {
+    criteria.loyaltyTier = ["Silver"];
+  }
+  
+  // Check for LTV mentions
+  if (normalizedQuery.includes("high value") || normalizedQuery.includes("high-value")) {
+    criteria.minLTV = 10000;
+  }
+  
+  // Check for churn risk
+  if (normalizedQuery.includes("churn") || normalizedQuery.includes("at risk")) {
+    criteria.churnRisk = true;
+    criteria.segment = ["Lapsed"];
+  }
+  
+  // Check for itinerary
+  if (normalizedQuery.includes("caribbean")) {
+    criteria.preferredItinerary = ["Caribbean"];
+  } else if (normalizedQuery.includes("alaska")) {
+    criteria.preferredItinerary = ["Alaska"];
+  } else if (normalizedQuery.includes("mediterranean")) {
+    criteria.preferredItinerary = ["Mediterranean"];
+  } else if (normalizedQuery.includes("europe")) {
+    criteria.preferredItinerary = ["Europe"];
+  }
+  
+  // Default to reactivation audience if no specific criteria
+  if (Object.keys(criteria).length === 0) {
+    criteria.segment = ["Lapsed"];
+    criteria.minLTV = 5000;
+  }
+  
+  const audienceData = buildAudience(criteria);
+  
+  // Get full customer list for ROI and recommendations
+  let filteredCustomers = [...customers];
+  if (criteria.segment) {
+    filteredCustomers = filteredCustomers.filter(c => criteria.segment!.includes(c.segment));
+  }
+  if (criteria.loyaltyTier) {
+    filteredCustomers = filteredCustomers.filter(c => criteria.loyaltyTier!.includes(c.loyaltyTier));
+  }
+  if (criteria.minLTV) {
+    filteredCustomers = filteredCustomers.filter(c => c.lifetimeValue >= criteria.minLTV!);
+  }
+  if (criteria.preferredItinerary) {
+    filteredCustomers = filteredCustomers.filter(c => criteria.preferredItinerary!.includes(c.preferredItinerary));
+  }
+  if (criteria.churnRisk) {
+    const cutoffDate = new Date("2025-02-01");
+    cutoffDate.setMonth(cutoffDate.getMonth() - 18);
+    filteredCustomers = filteredCustomers.filter(c => new Date(c.lastCruiseDate) < cutoffDate);
+  }
+  
+  // Add ROI projection and recommendation
+  const roiProjection = calculateROIProjection(filteredCustomers, "Reactivation");
+  const recommendation = generateCampaignRecommendation(filteredCustomers);
+  
+  const enrichedData: AudiencePreviewData = {
+    ...audienceData,
+    roiProjection,
+    recommendation,
+  };
+  
+  return createMessage(
+    `I found ${audienceData.count} customers matching your criteria. Here's a preview with ROI projection and campaign recommendations.`,
+    {
+      type: "audience_preview",
+      title: "Audience Preview",
+      data: enrichedData,
+    },
+    [] // Actions are built into the audience preview component
+  );
+}
+
+function handleAudienceByItinerary(query: string, context: QueryContext): ChatMessage {
+  const normalizedQuery = query.toLowerCase();
+  
+  let itinerary: "Caribbean" | "Alaska" | "Europe" | "Mediterranean" = "Caribbean";
+  if (normalizedQuery.includes("alaska")) itinerary = "Alaska";
+  else if (normalizedQuery.includes("mediterranean")) itinerary = "Mediterranean";
+  else if (normalizedQuery.includes("europe")) itinerary = "Europe";
+  
+  const audienceData = getAudienceForItinerary(itinerary);
+  
+  // Get full customer list
+  const filteredCustomers = customers.filter(c => 
+    c.preferredItinerary === itinerary && 
+    (c.segment === "Lapsed" || c.segment === "Active")
+  );
+  
+  const roiProjection = calculateROIProjection(filteredCustomers, "Reactivation");
+  const recommendation = generateCampaignRecommendation(filteredCustomers);
+  
+  const enrichedData: AudiencePreviewData = {
+    ...audienceData,
+    roiProjection,
+    recommendation,
+  };
+  
+  return createMessage(
+    `Here are ${audienceData.count} customers who prefer ${itinerary} cruises. The majority are either Active or Lapsed — perfect for a targeted campaign.`,
+    {
+      type: "audience_preview",
+      title: `${itinerary} Preference Audience`,
+      data: enrichedData,
+    },
+    []
+  );
+}
+
+// ============ ROI PROJECTION HANDLERS ============
+
+function handleROIProjection(query: string, context: QueryContext): ChatMessage {
+  // Use reactivation audience as default
+  const audienceData = getAudienceForReactivation();
+  
+  const filteredCustomers = customers.filter(c => 
+    c.segment === "Lapsed" && 
+    c.lifetimeValue >= 8000
+  ).filter(c => {
+    const cutoffDate = new Date("2025-02-01");
+    cutoffDate.setMonth(cutoffDate.getMonth() - 18);
+    return new Date(c.lastCruiseDate) < cutoffDate;
+  });
+  
+  const roiProjection = calculateROIProjection(filteredCustomers, "Reactivation");
+  
+  return createMessage(
+    `Based on your reactivation audience of ${roiProjection.audienceSize} customers:\n\n**Realistic scenario** (${(roiProjection.historicalResponseRate * 100).toFixed(1)}% response rate):\n• Expected bookings: ${Math.round(roiProjection.audienceSize * roiProjection.historicalResponseRate)}\n• Projected revenue: **$${roiProjection.realisticRevenue.toLocaleString()}**\n• Campaign cost: $${roiProjection.estimatedCost.toLocaleString()}\n• Estimated ROI: **${roiProjection.estimatedROI.toFixed(1)}x**\n\n**Optimistic scenario** (10% response rate):\n• Projected revenue: $${roiProjection.optimisticRevenue.toLocaleString()}\n\nAverage order value for this audience: $${roiProjection.avgOrderValue.toLocaleString()}`,
+    {
+      type: "metrics",
+      data: [
+        { label: "Audience Size", value: roiProjection.audienceSize },
+        { label: "Avg Order Value", value: `$${roiProjection.avgOrderValue.toLocaleString()}` },
+        { label: "Realistic Revenue", value: `$${roiProjection.realisticRevenue.toLocaleString()}` },
+        { label: "Estimated ROI", value: `${roiProjection.estimatedROI.toFixed(1)}x` },
+      ],
+    },
+    [
+      { id: "create-roi-audience", label: "Create This Audience", icon: "users", action: "create_audience" },
+      { id: "launch-campaign-roi", label: "Launch Campaign", icon: "rocket", action: "launch_campaign" },
+    ]
+  );
+}
+
+// ============ CAMPAIGN RECOMMENDATION HANDLERS ============
+
+function handleCampaignRecommendation(query: string, context: QueryContext): ChatMessage {
+  // Use high-value lapsed as the default target audience
+  const audienceData = getAudienceForHighValueLapsed();
+  
+  const filteredCustomers = customers.filter(c => 
+    c.segment === "Lapsed" && 
+    c.lifetimeValue >= 15000
+  );
+  
+  const recommendation = generateCampaignRecommendation(filteredCustomers);
+  const roiProjection = calculateROIProjection(filteredCustomers, recommendation.campaignType);
+  
+  const confidenceEmoji = recommendation.confidence === "high" ? "High" : 
+    recommendation.confidence === "medium" ? "Medium" : "Low";
+  
+  return createMessage(
+    `**Campaign Recommendation** (${confidenceEmoji} confidence)\n\n**Type:** ${recommendation.campaignType} via ${recommendation.channel}\n\n**Messaging:** ${recommendation.messaging}\n\n**Why this approach:** ${recommendation.rationale}\n\n**Expected response rate:** ${(recommendation.expectedResponseRate * 100).toFixed(1)}%\n\nFor an audience of ${filteredCustomers.length} high-value lapsed customers, this could generate **$${roiProjection.realisticRevenue.toLocaleString()}** in projected revenue.`,
+    {
+      type: "audience_preview",
+      data: {
+        ...audienceData,
+        roiProjection,
+        recommendation,
+      },
+    },
+    []
+  );
+}
+
+function handleReactivationOpportunity(query: string, context: QueryContext): ChatMessage {
+  const audienceData = getAudienceForReactivation();
+  
+  const filteredCustomers = customers.filter(c => 
+    c.segment === "Lapsed" && 
+    c.lifetimeValue >= 8000
+  ).filter(c => {
+    const cutoffDate = new Date("2025-02-01");
+    cutoffDate.setMonth(cutoffDate.getMonth() - 18);
+    return new Date(c.lastCruiseDate) < cutoffDate;
+  });
+  
+  const recommendation = generateReactivationRecommendation(filteredCustomers);
+  const roiProjection = calculateROIProjection(filteredCustomers, "Reactivation");
+  
+  return createMessage(
+    `Great question! I found **${filteredCustomers.length}** customers who are prime reactivation candidates — they have solid lifetime value ($8k+) but haven't sailed in 18+ months.\n\nThese lapsed customers are worth pursuing because reactivation campaigns typically deliver 2-3x better ROAS than prospecting.`,
+    {
+      type: "audience_preview",
+      data: {
+        ...audienceData,
+        roiProjection,
+        recommendation,
+      },
+    },
+    []
   );
 }
 

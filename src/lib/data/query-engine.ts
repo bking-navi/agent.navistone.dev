@@ -1,4 +1,7 @@
-import type { Booking, Campaign, Customer, Itinerary, CabinType, CampaignType, ChartDataPoint } from "@/types";
+import type { 
+  Booking, Campaign, Customer, Itinerary, CabinType, CampaignType, ChartDataPoint,
+  FunnelStage, AudienceCriteria, ROIProjection, AudiencePreviewData
+} from "@/types";
 import { bookings } from "./bookings";
 import { campaigns } from "./campaigns";
 import { customers } from "./customers";
@@ -290,4 +293,272 @@ export function getOverallMetrics() {
     totalCustomers: customers.length,
     activeCustomers: customers.filter((c) => c.segment === "Active" || c.segment === "VIP").length,
   };
+}
+
+// ============ FUNNEL DATA ============
+
+export function getFunnelData(campaignId?: string): FunnelStage[] {
+  // Get relevant campaigns
+  const relevantCampaigns = campaignId 
+    ? campaigns.filter(c => c.campaignId === campaignId)
+    : campaigns;
+  
+  // Calculate total impressions (mail volume + estimated digital impressions)
+  const totalMailVolume = relevantCampaigns.reduce((sum, c) => sum + c.mailVolume, 0);
+  const totalDigitalSpend = relevantCampaigns
+    .filter(c => c.channel === "Display" || c.channel === "Email")
+    .reduce((sum, c) => sum + c.adSpend, 0);
+  const estimatedDigitalImpressions = totalDigitalSpend * 50; // ~$0.02 CPM
+  const totalImpressions = totalMailVolume + estimatedDigitalImpressions;
+  
+  // Realistic funnel conversion rates for cruise industry direct mail
+  // Site visit rate: ~3% of impressions
+  const siteVisits = Math.round(totalImpressions * 0.03);
+  
+  // Booking rate: ~10% of site visitors (0.3% of total impressions)
+  const relevantBookings = campaignId
+    ? bookings.filter(b => b.campaignId === campaignId)
+    : filterCampaignAttributedBookings();
+  const bookingCount = relevantBookings.length;
+  
+  return [
+    { 
+      stage: "Impressions", 
+      count: totalImpressions,
+      conversionRate: totalImpressions > 0 ? (siteVisits / totalImpressions) * 100 : 0
+    },
+    { 
+      stage: "Site Visits", 
+      count: siteVisits,
+      conversionRate: siteVisits > 0 ? (bookingCount / siteVisits) * 100 : 0
+    },
+    { 
+      stage: "Bookings", 
+      count: bookingCount,
+      conversionRate: undefined // No next stage
+    },
+  ];
+}
+
+export function getFunnelByCampaignType(campaignType: CampaignType): FunnelStage[] {
+  const typeCampaigns = campaigns.filter(c => c.campaignType === campaignType);
+  const campaignIds = typeCampaigns.map(c => c.campaignId);
+  
+  const totalMailVolume = typeCampaigns.reduce((sum, c) => sum + c.mailVolume, 0);
+  const totalDigitalSpend = typeCampaigns
+    .filter(c => c.channel === "Display" || c.channel === "Email")
+    .reduce((sum, c) => sum + c.adSpend, 0);
+  const estimatedDigitalImpressions = totalDigitalSpend * 50;
+  const totalImpressions = totalMailVolume + estimatedDigitalImpressions;
+  
+  // Adjust conversion rates by campaign type
+  const visitRateMultiplier = campaignType === "Retargeting" ? 1.5 
+    : campaignType === "Reactivation" ? 1.2 
+    : 1.0;
+  
+  const siteVisits = Math.round(totalImpressions * 0.03 * visitRateMultiplier);
+  const typeBookings = bookings.filter(b => b.campaignId && campaignIds.includes(b.campaignId));
+  
+  return [
+    { 
+      stage: "Impressions", 
+      count: totalImpressions,
+      conversionRate: totalImpressions > 0 ? (siteVisits / totalImpressions) * 100 : 0
+    },
+    { 
+      stage: "Site Visits", 
+      count: siteVisits,
+      conversionRate: siteVisits > 0 ? (typeBookings.length / siteVisits) * 100 : 0
+    },
+    { 
+      stage: "Bookings", 
+      count: typeBookings.length,
+      conversionRate: undefined
+    },
+  ];
+}
+
+// ============ AUDIENCE BUILDER ============
+
+export function buildAudience(criteria: AudienceCriteria): AudiencePreviewData {
+  let filtered = [...customers];
+  
+  // Filter by segment
+  if (criteria.segment && criteria.segment.length > 0) {
+    filtered = filtered.filter(c => criteria.segment!.includes(c.segment));
+  }
+  
+  // Filter by loyalty tier
+  if (criteria.loyaltyTier && criteria.loyaltyTier.length > 0) {
+    filtered = filtered.filter(c => criteria.loyaltyTier!.includes(c.loyaltyTier));
+  }
+  
+  // Filter by minimum LTV
+  if (criteria.minLTV !== undefined) {
+    filtered = filtered.filter(c => c.lifetimeValue >= criteria.minLTV!);
+  }
+  
+  // Filter by maximum LTV
+  if (criteria.maxLTV !== undefined) {
+    filtered = filtered.filter(c => c.lifetimeValue <= criteria.maxLTV!);
+  }
+  
+  // Filter by preferred itinerary
+  if (criteria.preferredItinerary && criteria.preferredItinerary.length > 0) {
+    filtered = filtered.filter(c => criteria.preferredItinerary!.includes(c.preferredItinerary));
+  }
+  
+  // Filter by preferred cabin type
+  if (criteria.preferredCabinType && criteria.preferredCabinType.length > 0) {
+    filtered = filtered.filter(c => criteria.preferredCabinType!.includes(c.preferredCabinType));
+  }
+  
+  // Filter by churn risk (lapsed with activity 18+ months ago)
+  if (criteria.churnRisk) {
+    const cutoffDate = new Date("2025-02-01");
+    cutoffDate.setMonth(cutoffDate.getMonth() - 18);
+    filtered = filtered.filter(c => {
+      const lastCruise = new Date(c.lastCruiseDate);
+      return lastCruise < cutoffDate;
+    });
+  }
+  
+  // Filter by acquisition channel
+  if (criteria.acquisitionChannel && criteria.acquisitionChannel.length > 0) {
+    filtered = filtered.filter(c => criteria.acquisitionChannel!.includes(c.acquisitionChannel));
+  }
+  
+  // Sort by LTV descending to show best customers first
+  filtered.sort((a, b) => b.lifetimeValue - a.lifetimeValue);
+  
+  // Take sample of top 5
+  const sample = filtered.slice(0, 5);
+  
+  return {
+    criteria,
+    count: filtered.length,
+    sample,
+  };
+}
+
+export function getAudienceForChurnRisk(): AudiencePreviewData {
+  const criteria: AudienceCriteria = {
+    segment: ["Lapsed"],
+    minLTV: 5000,
+    churnRisk: true,
+  };
+  return buildAudience(criteria);
+}
+
+export function getAudienceForHighValueLapsed(): AudiencePreviewData {
+  const criteria: AudienceCriteria = {
+    segment: ["Lapsed"],
+    minLTV: 15000,
+  };
+  return buildAudience(criteria);
+}
+
+export function getAudienceForItinerary(itinerary: Itinerary): AudiencePreviewData {
+  const criteria: AudienceCriteria = {
+    preferredItinerary: [itinerary],
+    segment: ["Lapsed", "Active"],
+  };
+  return buildAudience(criteria);
+}
+
+export function getAudienceForReactivation(): AudiencePreviewData {
+  const criteria: AudienceCriteria = {
+    segment: ["Lapsed"],
+    minLTV: 8000,
+    churnRisk: true,
+  };
+  return buildAudience(criteria);
+}
+
+// ============ ROI PROJECTION ============
+
+export function calculateROIProjection(
+  audienceCustomers: Customer[], 
+  campaignType: CampaignType = "Reactivation"
+): ROIProjection {
+  const audienceSize = audienceCustomers.length;
+  
+  // Calculate average order value from the audience's historical data
+  const avgLTV = audienceCustomers.length > 0
+    ? audienceCustomers.reduce((sum, c) => sum + c.lifetimeValue, 0) / audienceCustomers.length
+    : 0;
+  
+  // Estimate AOV as a portion of LTV (assuming 2-3 cruises on average)
+  const avgOrderValue = Math.round(avgLTV / 2.5);
+  
+  // Historical response rates by campaign type
+  const responseRates: Record<CampaignType, number> = {
+    Prospecting: 0.003,    // 0.3%
+    Reactivation: 0.023,   // 2.3%
+    Retargeting: 0.015,    // 1.5%
+  };
+  
+  const historicalResponseRate = responseRates[campaignType];
+  
+  // Calculate projections
+  const optimisticConversion = 0.10; // 10% optimistic scenario
+  const realisticConversion = historicalResponseRate;
+  
+  const optimisticRevenue = Math.round(audienceSize * optimisticConversion * avgOrderValue);
+  const realisticRevenue = Math.round(audienceSize * realisticConversion * avgOrderValue);
+  
+  // Estimated cost: ~$0.30 per piece for direct mail
+  const costPerPiece = 0.30;
+  const estimatedCost = Math.round(audienceSize * costPerPiece);
+  
+  // ROI calculation (realistic scenario)
+  const estimatedROI = estimatedCost > 0 ? realisticRevenue / estimatedCost : 0;
+  
+  return {
+    audienceSize,
+    avgOrderValue,
+    historicalResponseRate,
+    optimisticRevenue,
+    realisticRevenue,
+    estimatedCost,
+    estimatedROI,
+  };
+}
+
+export function getROIProjectionForAudience(criteria: AudienceCriteria, campaignType: CampaignType = "Reactivation"): ROIProjection {
+  const audience = buildAudience(criteria);
+  // Get full customer list matching criteria (not just sample)
+  let filtered = [...customers];
+  
+  if (criteria.segment && criteria.segment.length > 0) {
+    filtered = filtered.filter(c => criteria.segment!.includes(c.segment));
+  }
+  if (criteria.loyaltyTier && criteria.loyaltyTier.length > 0) {
+    filtered = filtered.filter(c => criteria.loyaltyTier!.includes(c.loyaltyTier));
+  }
+  if (criteria.minLTV !== undefined) {
+    filtered = filtered.filter(c => c.lifetimeValue >= criteria.minLTV!);
+  }
+  if (criteria.maxLTV !== undefined) {
+    filtered = filtered.filter(c => c.lifetimeValue <= criteria.maxLTV!);
+  }
+  if (criteria.preferredItinerary && criteria.preferredItinerary.length > 0) {
+    filtered = filtered.filter(c => criteria.preferredItinerary!.includes(c.preferredItinerary));
+  }
+  if (criteria.preferredCabinType && criteria.preferredCabinType.length > 0) {
+    filtered = filtered.filter(c => criteria.preferredCabinType!.includes(c.preferredCabinType));
+  }
+  if (criteria.churnRisk) {
+    const cutoffDate = new Date("2025-02-01");
+    cutoffDate.setMonth(cutoffDate.getMonth() - 18);
+    filtered = filtered.filter(c => {
+      const lastCruise = new Date(c.lastCruiseDate);
+      return lastCruise < cutoffDate;
+    });
+  }
+  if (criteria.acquisitionChannel && criteria.acquisitionChannel.length > 0) {
+    filtered = filtered.filter(c => criteria.acquisitionChannel!.includes(c.acquisitionChannel));
+  }
+  
+  return calculateROIProjection(filtered, campaignType);
 }

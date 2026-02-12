@@ -3,6 +3,24 @@ import type { Insight } from "@/types";
 // Pre-computed anomalies/insights for the proactive sidebar
 // In a real system, these would be detected by analyzing the data
 export const insights: Insight[] = [
+  // Action-oriented insights (shown first)
+  {
+    id: "insight-funnel",
+    type: "info",
+    title: "View campaign conversion funnel",
+    description: "See how your campaigns convert from impressions to site visits to bookings.",
+    metric: "Funnel",
+    timestamp: new Date("2025-02-02"),
+  },
+  {
+    id: "insight-audience",
+    type: "info",
+    title: "Build a reactivation audience",
+    description: "Find lapsed customers worth targeting. Get ROI projections and campaign recommendations.",
+    metric: "Audience",
+    timestamp: new Date("2025-02-02"),
+  },
+  // Data-driven insights
   {
     id: "insight-001",
     type: "warning",
@@ -11,6 +29,14 @@ export const insights: Insight[] = [
     metric: "-23%",
     change: -23,
     timestamp: new Date("2025-01-28"),
+  },
+  {
+    id: "insight-004",
+    type: "warning",
+    title: "84 customers at high churn risk",
+    description: "Customers with 18+ months since last cruise and LTV > $10k. Recommended for win-back campaign.",
+    metric: "84",
+    timestamp: new Date("2025-01-31"),
   },
   {
     id: "insight-002",
@@ -29,14 +55,6 @@ export const insights: Insight[] = [
     metric: "2.1x",
     change: 110,
     timestamp: new Date("2025-01-29"),
-  },
-  {
-    id: "insight-004",
-    type: "warning",
-    title: "84 customers at high churn risk",
-    description: "Customers with 18+ months since last cruise and LTV > $10k. Recommended for win-back campaign.",
-    metric: "84",
-    timestamp: new Date("2025-01-31"),
   },
   {
     id: "insight-005",

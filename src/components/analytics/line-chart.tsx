@@ -7,61 +7,80 @@ interface LineChartProps {
   title?: string;
   valuePrefix?: string;
   valueSuffix?: string;
-  height?: number;
 }
 
-export function LineChart({ data, title, valuePrefix = "", valueSuffix = "", height = 200 }: LineChartProps) {
+export function LineChart({ data, title, valuePrefix = "", valueSuffix = "" }: LineChartProps) {
   const maxValue = Math.max(...data.map((d) => d.value));
   const minValue = Math.min(...data.map((d) => d.value));
   const range = maxValue - minValue || 1;
 
-  // Calculate points for SVG polyline
-  const padding = 40;
-  const chartWidth = 100; // percentage-based
-  const chartHeight = height - padding;
+  const svgWidth = 500;
+  const svgHeight = 160;
+  const paddingTop = 10;
+  const paddingBottom = 5;
+  const paddingLeft = 5;
+  const paddingRight = 5;
+  const chartWidth = svgWidth - paddingLeft - paddingRight;
+  const chartHeight = svgHeight - paddingTop - paddingBottom;
 
   const points = data.map((item, index) => {
-    const x = (index / (data.length - 1)) * 100;
-    const y = chartHeight - ((item.value - minValue) / range) * (chartHeight - padding);
+    const x = paddingLeft + (data.length > 1 ? (index / (data.length - 1)) * chartWidth : chartWidth / 2);
+    const y = paddingTop + chartHeight - ((item.value - minValue) / range) * chartHeight;
     return { x, y, item };
   });
 
   const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+  const areaPoints = `${paddingLeft},${svgHeight - paddingBottom} ${polylinePoints} ${svgWidth - paddingRight},${svgHeight - paddingBottom}`;
+
+  // Show ~5 labels evenly distributed
+  const labelInterval = Math.ceil(data.length / 5);
 
   return (
-    <div className="space-y-3">
-      {title && <h4 className="text-sm font-medium text-muted-foreground">{title}</h4>}
-      <div className="relative" style={{ height }}>
+    <div className="rounded-lg border bg-card p-4">
+      {title && (
+        <h4 className="text-sm font-semibold mb-4">{title}</h4>
+      )}
+      
+      <div className="relative">
         <svg
-          viewBox={`0 0 100 ${height}`}
-          className="w-full h-full"
-          preserveAspectRatio="none"
+          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          className="w-full h-auto"
+          style={{ maxHeight: 180 }}
         >
-          {/* Grid lines */}
-          {[0, 25, 50, 75, 100].map((pct) => (
+          {/* Horizontal grid lines */}
+          {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => (
             <line
-              key={pct}
-              x1="0"
-              y1={padding / 2 + ((100 - pct) / 100) * (chartHeight - padding)}
-              x2="100"
-              y2={padding / 2 + ((100 - pct) / 100) * (chartHeight - padding)}
-              className="stroke-muted"
-              strokeWidth="0.2"
+              key={i}
+              x1={paddingLeft}
+              y1={paddingTop + chartHeight * (1 - pct)}
+              x2={svgWidth - paddingRight}
+              y2={paddingTop + chartHeight * (1 - pct)}
+              stroke="currentColor"
+              className="text-muted/30"
+              strokeWidth="1"
             />
           ))}
 
+          {/* Gradient definition */}
+          <defs>
+            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+
           {/* Area fill */}
           <polygon
-            points={`0,${chartHeight} ${polylinePoints} 100,${chartHeight}`}
-            className="fill-blue-500/10"
+            points={areaPoints}
+            fill="url(#areaGradient)"
           />
 
           {/* Line */}
           <polyline
             points={polylinePoints}
             fill="none"
-            className="stroke-blue-500"
-            strokeWidth="0.8"
+            stroke="rgb(59, 130, 246)"
+            strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -72,28 +91,34 @@ export function LineChart({ data, title, valuePrefix = "", valueSuffix = "", hei
               key={i}
               cx={p.x}
               cy={p.y}
-              r="1.5"
-              className="fill-blue-500"
+              r="4"
+              fill="white"
+              stroke="rgb(59, 130, 246)"
+              strokeWidth="2"
             />
           ))}
         </svg>
 
         {/* X-axis labels */}
-        <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-muted-foreground px-1">
-          {data.filter((_, i) => i % Math.ceil(data.length / 6) === 0 || i === data.length - 1).map((item) => (
-            <span key={item.label}>{item.label}</span>
+        <div className="flex justify-between text-xs text-muted-foreground mt-2 px-1">
+          {data.map((item, i) => (
+            (i % labelInterval === 0 || i === data.length - 1) ? (
+              <span key={i}>{item.label}</span>
+            ) : (
+              <span key={i} className="w-0" />
+            )
           ))}
         </div>
       </div>
 
-      {/* Legend / summary */}
-      <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground">
-          Min: {valuePrefix}{minValue.toLocaleString()}{valueSuffix}
-        </span>
-        <span className="text-muted-foreground">
-          Max: {valuePrefix}{maxValue.toLocaleString()}{valueSuffix}
-        </span>
+      {/* Summary stats */}
+      <div className="flex justify-between text-xs text-muted-foreground mt-3 pt-3 border-t">
+        <div>
+          <span className="text-foreground font-medium">Min:</span> {valuePrefix}{minValue.toLocaleString()}{valueSuffix}
+        </div>
+        <div>
+          <span className="text-foreground font-medium">Max:</span> {valuePrefix}{maxValue.toLocaleString()}{valueSuffix}
+        </div>
       </div>
     </div>
   );

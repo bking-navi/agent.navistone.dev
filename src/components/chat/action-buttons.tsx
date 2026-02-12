@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Users, Download, Calendar } from "lucide-react";
+import { Users, Download, Calendar, Rocket, Settings } from "lucide-react";
 import type { ActionButton } from "@/types";
 
 interface ActionButtonsProps {
@@ -13,6 +13,8 @@ const iconMap = {
   users: Users,
   download: Download,
   calendar: Calendar,
+  rocket: Rocket,
+  settings: Settings,
 };
 
 export function ActionButtons({ actions, onAction }: ActionButtonsProps) {

@@ -6,9 +6,11 @@ import { BarChart } from "@/components/analytics/bar-chart";
 import { LineChart } from "@/components/analytics/line-chart";
 import { MetricsCard } from "@/components/analytics/metrics-card";
 import { DataTable } from "@/components/analytics/data-table";
+import { FunnelChart } from "@/components/analytics/funnel-chart";
+import { AudiencePreview } from "@/components/analytics/audience-preview";
 import { ActionButtons } from "./action-buttons";
 import { User, Bot } from "lucide-react";
-import type { ChatMessage as ChatMessageType, ActionButton, ChartDataPoint, MetricData, TableData } from "@/types";
+import type { ChatMessage as ChatMessageType, ActionButton, ChartDataPoint, MetricData, TableData, FunnelStage, AudiencePreviewData } from "@/types";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -44,7 +46,7 @@ export function ChatMessage({ message, onAction }: ChatMessageProps) {
               {/* Visualization */}
               {message.visualization && (
                 <div className="pt-2">
-                  {renderVisualization(message.visualization)}
+                  {renderVisualization(message.visualization, onAction)}
                 </div>
               )}
 
@@ -60,7 +62,10 @@ export function ChatMessage({ message, onAction }: ChatMessageProps) {
   );
 }
 
-function renderVisualization(config: ChatMessageType["visualization"]) {
+function renderVisualization(
+  config: ChatMessageType["visualization"], 
+  onAction?: (action: ActionButton) => void
+) {
   if (!config) return null;
 
   switch (config.type) {
@@ -85,6 +90,20 @@ function renderVisualization(config: ChatMessageType["visualization"]) {
       return <MetricsCard metrics={config.data as MetricData[]} />;
     case "table":
       return <DataTable data={config.data as TableData} />;
+    case "funnel":
+      return (
+        <FunnelChart
+          data={config.data as FunnelStage[]}
+          title={config.title}
+        />
+      );
+    case "audience_preview":
+      return (
+        <AudiencePreview
+          data={config.data as AudiencePreviewData}
+          onAction={onAction}
+        />
+      );
     default:
       return null;
   }

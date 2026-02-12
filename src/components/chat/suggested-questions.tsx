@@ -8,11 +8,16 @@ interface SuggestedQuestionsProps {
 }
 
 const suggestions = [
-  "What's our ROAS by itinerary over the last 90 days?",
-  "Show bookings and revenue by cabin type",
-  "Which sail dates are most responsive to prospecting vs reactivation?",
-  "How many customers are in each loyalty tier?",
-  "Which customers are at risk of churning?",
+  "What's our ROAS by itinerary?",
+  "Show me the conversion funnel",
+  "Show bookings by cabin type",
+  "How are we tracking this quarter?",
+  "Build an audience of lapsed customers",
+  "Recommend a campaign for reactivation",
+  "Which customers are at high churn risk?",
+  "What's the ROI if we target lapsed customers?",
+  "Compare prospecting vs reactivation",
+  "Show revenue trend over time",
 ];
 
 export function SuggestedQuestions({ onSelect }: SuggestedQuestionsProps) {
@@ -28,7 +33,7 @@ export function SuggestedQuestions({ onSelect }: SuggestedQuestionsProps) {
             key={question}
             variant="outline"
             size="sm"
-            className="text-left h-auto py-2 px-3 whitespace-normal"
+            className="text-left h-auto py-2 px-3"
             onClick={() => onSelect(question)}
           >
             {question}

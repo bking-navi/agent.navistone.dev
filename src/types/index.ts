@@ -62,14 +62,14 @@ export interface ActionButton {
   id: string;
   label: string;
   icon: string;
-  action: "create_audience" | "export_csv" | "schedule_report";
+  action: "create_audience" | "export_csv" | "schedule_report" | "launch_campaign" | "refine_audience";
   payload?: Record<string, unknown>;
 }
 
 export interface VisualizationConfig {
-  type: "bar" | "line" | "grouped_bar" | "metrics" | "table";
+  type: "bar" | "line" | "grouped_bar" | "metrics" | "table" | "funnel" | "audience_preview";
   title?: string;
-  data: ChartDataPoint[] | MetricData[] | TableData;
+  data: ChartDataPoint[] | MetricData[] | TableData | FunnelStage[] | AudiencePreviewData;
   xKey?: string;
   yKey?: string;
   groupKey?: string;
@@ -92,6 +92,54 @@ export interface MetricData {
 export interface TableData {
   columns: { key: string; label: string }[];
   rows: Record<string, unknown>[];
+}
+
+// Funnel visualization types
+export interface FunnelStage {
+  stage: string;
+  count: number;
+  conversionRate?: number; // Rate to next stage
+}
+
+// Audience builder types
+export interface AudienceCriteria {
+  segment?: CustomerSegment[];
+  loyaltyTier?: Customer["loyaltyTier"][];
+  minLTV?: number;
+  maxLTV?: number;
+  preferredItinerary?: Itinerary[];
+  preferredCabinType?: CabinType[];
+  churnRisk?: boolean;
+  acquisitionChannel?: AcquisitionChannel[];
+}
+
+export interface AudiencePreviewData {
+  criteria: AudienceCriteria;
+  count: number;
+  sample: Customer[];
+  roiProjection?: ROIProjection;
+  recommendation?: CampaignRecommendation;
+}
+
+// ROI projection types
+export interface ROIProjection {
+  audienceSize: number;
+  avgOrderValue: number;
+  historicalResponseRate: number;
+  optimisticRevenue: number;   // 10% conversion
+  realisticRevenue: number;    // historical rate
+  estimatedCost: number;       // based on mail volume
+  estimatedROI: number;        // realistic revenue / cost
+}
+
+// Campaign recommendation types
+export interface CampaignRecommendation {
+  campaignType: CampaignType;
+  channel: MarketingChannel;
+  messaging: string;
+  rationale: string;
+  expectedResponseRate: number;
+  confidence: "high" | "medium" | "low";
 }
 
 // Insight / Alert types

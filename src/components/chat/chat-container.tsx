@@ -81,28 +81,61 @@ export function ChatContainer() {
   };
 
   const handleInsightClick = async (insight: Insight) => {
+    const userMessageContent = getUserMessageForInsight(insight);
+    
     // Create a natural user message based on the insight
     const userMessage: ChatMessageType = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: getUserMessageForInsight(insight),
+      content: userMessageContent,
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
     
-    // Small delay to feel natural
-    setTimeout(() => {
-      const response = getInsightResponse(insight);
-      setMessages((prev) => [...prev, response]);
-      setIsLoading(false);
-    }, 500 + Math.random() * 400);
+    // For action-oriented insights (funnel, audience), use the API
+    if (shouldUseAPI(insight)) {
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: userMessageContent, context }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setMessages((prev) => [...prev, data.message]);
+          setContext(data.context);
+        }
+      } catch (error) {
+        console.error("Error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // For data-driven insights, use pre-built responses
+      setTimeout(() => {
+        const response = getInsightResponse(insight);
+        setMessages((prev) => [...prev, response]);
+        setIsLoading(false);
+      }, 500 + Math.random() * 400);
+    }
   };
 
   // Generate a natural user message for each insight type
   function getUserMessageForInsight(insight: Insight): string {
     const title = insight.title.toLowerCase();
+    const id = insight.id;
     
+    // Action-oriented insights
+    if (id === "insight-funnel") {
+      return "Show me the conversion funnel";
+    }
+    if (id === "insight-audience") {
+      return "Show me reactivation opportunities";
+    }
+    
+    // Data-driven insights
     if (title.includes("caribbean") && title.includes("down")) {
       return "What's going on with Caribbean bookings?";
     }
@@ -124,6 +157,11 @@ export function ChatContainer() {
     
     return "Tell me more about this";
   }
+  
+  // Check if insight should use the API instead of pre-built response
+  function shouldUseAPI(insight: Insight): boolean {
+    return insight.id === "insight-funnel" || insight.id === "insight-audience";
+  }
 
   const handleAction = (action: ActionButton) => {
     setActionDialog({ open: true, action, confirmed: false });
@@ -141,11 +179,20 @@ export function ChatContainer() {
     if (!action) return "";
     switch (action.action) {
       case "create_audience":
-        return `This will create a new audience segment with the selected customers. You can use this segment for targeted campaigns.`;
+        const audienceCount = action.payload?.count;
+        return `This will create a new audience segment${audienceCount ? ` with ${audienceCount} customers` : ""}. You can use this segment for targeted campaigns in your CDP.`;
       case "export_csv":
         return `This will download the data as a CSV file that you can open in Excel or import into other tools.`;
       case "schedule_report":
         return `This will set up an automated report that will be delivered to your inbox on a regular schedule.`;
+      case "launch_campaign":
+        const rec = action.payload?.recommendation as { campaignType?: string; channel?: string; expectedResponseRate?: number } | undefined;
+        if (rec) {
+          return `This will launch a ${rec.campaignType} campaign via ${rec.channel}. Expected response rate: ${((rec.expectedResponseRate || 0) * 100).toFixed(1)}%. You'll be able to review creative and confirm before sending.`;
+        }
+        return `This will start the campaign creation workflow with the recommended settings.`;
+      case "refine_audience":
+        return `This will open the audience builder so you can adjust the criteria and preview different segments.`;
       default:
         return "";
     }
@@ -154,26 +201,34 @@ export function ChatContainer() {
   return (
     <div className="flex flex-col h-full">
       {/* Messages area */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4 max-w-3xl mx-auto">
+      <ScrollArea className="flex-1">
+        <div className="max-w-3xl mx-auto px-4 py-6">
           {messages.length === 0 ? (
-            <div className="py-8 space-y-8">
-              <div className="text-center space-y-2">
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="text-center space-y-2 pt-4">
                 <h2 className="text-2xl font-semibold">NaviStone Analytics Agent</h2>
                 <p className="text-muted-foreground">
                   Ask questions about your campaign performance, customer segments, and more.
                 </p>
               </div>
               
+              {/* Input - prominently placed in empty state */}
+              <div className="pt-2">
+                <ChatInput onSend={sendMessage} disabled={isLoading} />
+              </div>
+              
+              {/* Insights */}
               <ProactiveInsights 
                 insights={getRecentInsights(4)} 
                 onInsightClick={handleInsightClick} 
               />
               
+              {/* Suggested questions */}
               <SuggestedQuestions onSelect={sendMessage} />
             </div>
           ) : (
-            <>
+            <div className="space-y-4">
               {messages.map((message) => (
                 <ChatMessage
                   key={message.id}
@@ -187,14 +242,23 @@ export function ChatContainer() {
                   <span className="text-sm animate-pulse">Analyzing your data...</span>
                 </div>
               )}
-            </>
+              <div ref={scrollRef} />
+            </div>
           )}
-          <div ref={scrollRef} />
         </div>
       </ScrollArea>
 
-      {/* Input area */}
-      <ChatInput onSend={sendMessage} disabled={isLoading} />
+      {/* Input area - only show at bottom when there are messages */}
+      {messages.length > 0 && (
+        <div className="w-full">
+          <div className="max-w-3xl mx-auto px-4 pb-4">
+            {/* ml-11 = 44px to align with message content (32px avatar + 12px gap) */}
+            <div className="ml-11">
+              <ChatInput onSend={sendMessage} disabled={isLoading} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Action confirmation dialog */}
       <Dialog
