@@ -8,16 +8,16 @@ interface SuggestedQuestionsProps {
 }
 
 const suggestions = [
-  "What's our ROAS by itinerary?",
-  "Show me the conversion funnel",
-  "Show bookings by cabin type",
-  "How are we tracking this quarter?",
-  "Build an audience of lapsed customers",
-  "Recommend a campaign for reactivation",
-  "Which customers are at high churn risk?",
-  "What's the ROI if we target lapsed customers?",
-  "Compare prospecting vs reactivation",
-  "Show revenue trend over time",
+  "Which destinations have the highest quality visitor traffic?",
+  "Which marketing channels deliver the highest quality traffic?",
+  "Show me the Exotic opportunity (Asia/Australia)",
+  "What's the relevance premium when creative matches intent?",
+  "Which channels are generating the most junk traffic?",
+  "Show visitor profiles for high-intent customers",
+  "What's the guardrail effect for Europe intenders?",
+  "How much revenue are we losing to creative mismatch?",
+  "Which destinations have the highest purchase intent scores?",
+  "Show me the channel quality scorecard",
 ];
 
 export function SuggestedQuestions({ onSelect }: SuggestedQuestionsProps) {

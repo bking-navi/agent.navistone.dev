@@ -1,6 +1,6 @@
 import type { ChatMessage, QueryContext, VisualizationConfig, ActionButton, ChartDataPoint, MetricData, TableData, AudiencePreviewData, AudienceCriteria } from "@/types";
 import * as queryEngine from "@/lib/data/query-engine";
-import { getChurnRiskCustomers, getHighValueLapsedCustomers, getFunnelData, getFunnelByCampaignType, buildAudience, calculateROIProjection, getAudienceForReactivation, getAudienceForHighValueLapsed, getAudienceForItinerary } from "@/lib/data/query-engine";
+import { getChurnRiskCustomers, getHighValueLapsedCustomers, getFunnelData, getFunnelByCampaignType, buildAudience, calculateROIProjection, getAudienceForReactivation, getAudienceForHighValueLapsed, getAudienceForItinerary, getRelevancePremium, getGuardrailEffects, getEliteHouseholds, getChannelQuality, getDestinationQuality, getVisitorProfiles, getExoticOpportunity, getLowQualityChannels, getHighQualityChannels, getDarkSocialMetrics } from "@/lib/data/query-engine";
 import { generateCampaignRecommendation, generateReactivationRecommendation } from "@/lib/ai/recommendations";
 import { customers } from "@/lib/data/customers";
 
@@ -56,6 +56,138 @@ interface QueryPattern {
 }
 
 const queryPatterns: QueryPattern[] = [
+  // ============ NCL CID PATTERNS (Priority) ============
+  
+  // Destination quality / traffic quality
+  {
+    patterns: [
+      /destination.*quality/i,
+      /quality.*visitor.*traffic/i,
+      /highest.*quality.*traffic/i,
+      /junk.*traffic.*rate/i,
+      /traffic.*quality/i,
+      /visitor.*quality/i,
+    ],
+    handler: handleDestinationQuality,
+  },
+  // Marketing channel quality
+  {
+    patterns: [
+      /channel.*quality/i,
+      /marketing.*channel.*quality/i,
+      /channel.*deliver.*quality/i,
+      /purchase.*intent.*score/i,
+      /channel.*scorecard/i,
+      /quality.*scorecard/i,
+    ],
+    handler: handleChannelQuality,
+  },
+  // Junk traffic / low quality channels
+  {
+    patterns: [
+      /junk.*traffic/i,
+      /low.*quality.*visitor/i,
+      /generating.*junk/i,
+      /waste.*channel/i,
+      /bot.*traffic/i,
+      /pinterest.*quality/i,
+      /programmatic.*quality/i,
+    ],
+    handler: handleJunkTraffic,
+  },
+  // Exotic opportunity (Asia/Australia)
+  {
+    patterns: [
+      /exotic.*opportunity/i,
+      /asia.*australia/i,
+      /asia.*opportunity/i,
+      /australia.*opportunity/i,
+      /high.*intent.*(asia|australia)/i,
+      /elite.*household/i,
+    ],
+    handler: handleExoticOpportunity,
+  },
+  // Relevance premium
+  {
+    patterns: [
+      /relevance.*premium/i,
+      /creative.*match/i,
+      /aov.*lift/i,
+      /matched.*creative/i,
+      /creative.*alignment/i,
+    ],
+    handler: handleRelevancePremium,
+  },
+  // Guardrail effect
+  {
+    patterns: [
+      /guardrail.*effect/i,
+      /retention.*matched/i,
+      /retention.*generic/i,
+      /creative.*retention/i,
+      /europe.*intender/i,
+      /hawaii.*intender/i,
+    ],
+    handler: handleGuardrailEffect,
+  },
+  // Visitor profiles
+  {
+    patterns: [
+      /visitor.*profile/i,
+      /high.*intent.*customer/i,
+      /elite.*visitor/i,
+      /propensity.*score/i,
+      /cart.*abandon/i,
+    ],
+    handler: handleVisitorProfiles,
+  },
+  // Revenue leakage / mismatch loss
+  {
+    patterns: [
+      /revenue.*leak/i,
+      /revenue.*loss/i,
+      /creative.*mismatch/i,
+      /losing.*revenue/i,
+      /mismatch.*loss/i,
+      /how much.*losing/i,
+    ],
+    handler: handleRevenueLoss,
+  },
+  // Purchase intent by destination
+  {
+    patterns: [
+      /purchase.*intent.*destination/i,
+      /highest.*intent.*score/i,
+      /strongest.*intent/i,
+      /intent.*by.*destination/i,
+    ],
+    handler: handlePurchaseIntentByDestination,
+  },
+  // Dark social / tagging issues
+  {
+    patterns: [
+      /dark.*social/i,
+      /unclassified.*traffic/i,
+      /tagging.*issue/i,
+      /generic.*tag/i,
+      /data.*governance/i,
+    ],
+    handler: handleDarkSocial,
+  },
+  // Marketing readiness / outreach
+  {
+    patterns: [
+      /ready.*marketing/i,
+      /marketing.*outreach/i,
+      /customer.*ready/i,
+      /outreach.*ready/i,
+      /conversion.*rate/i,
+    ],
+    handler: handleMarketingReadiness,
+  },
+  
+  // ============ LEGACY PATTERNS ============
+  
   // ROAS by itinerary
   {
     patterns: [
@@ -1002,6 +1134,374 @@ function handleYoYComparison(query: string, context: QueryContext): ChatMessage 
       ],
     },
     []
+  );
+}
+
+// ============ NCL CID HANDLERS ============
+
+function handleDestinationQuality(query: string, context: QueryContext): ChatMessage {
+  const destinations = getDestinationQuality();
+  
+  // Sort by propensity score for display
+  const sortedByQuality = [...destinations].sort((a, b) => b.avgPropensityScore - a.avgPropensityScore);
+  
+  const chartData: ChartDataPoint[] = sortedByQuality.map(d => ({
+    label: d.destination,
+    value: d.avgPropensityScore,
+  }));
+  
+  const tableData: TableData = {
+    columns: [
+      { key: "destination", label: "Destination" },
+      { key: "eliteHouseholds", label: "Elite Households" },
+      { key: "avgScore", label: "Avg Propensity Score" },
+      { key: "matchRate", label: "Creative Match Rate" },
+      { key: "status", label: "Status" },
+    ],
+    rows: sortedByQuality.map(d => ({
+      destination: d.destination,
+      eliteHouseholds: d.eliteHouseholds.toLocaleString(),
+      avgScore: d.avgPropensityScore.toFixed(2),
+      matchRate: `${d.currentMatchRate}%`,
+      status: d.currentMatchRate === 0 ? "🔴 100% Leakage" : d.currentMatchRate < 50 ? "🟡 Partial Match" : "🟢 Good Match",
+    })),
+  };
+  
+  return createMessage(
+    `**Visitor Traffic Quality by Destination**\n\nThe data reveals a critical finding: **Asia and Australia have the highest quality visitors** with an average propensity score of **6.18** — these are cart abandoners ready to book. However, they're receiving **0% matched creative**, resulting in 100% revenue leakage.\n\nMeanwhile, Caribbean (your default creative) has high volume but lower quality scores. The "Exotic" destinations represent your highest-intent traffic being completely ignored.\n\n*This analysis is powered by NCL's proprietary E-Commerce Propensity Model, continuously trained on visitor session data.*`,
+    {
+      type: "table",
+      title: "Destination Quality Analysis",
+      data: tableData,
+    },
+    [
+      { id: "view-exotic", label: "View Exotic Opportunity", icon: "users", action: "create_audience" },
+      { id: "export-quality", label: "Export Analysis", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+function handleChannelQuality(query: string, context: QueryContext): ChatMessage {
+  const channels = getChannelQuality();
+  
+  // Sort by elite rate
+  const sorted = [...channels].sort((a, b) => b.eliteRate - a.eliteRate);
+  
+  const chartData: ChartDataPoint[] = sorted.map(c => ({
+    label: c.channel,
+    value: c.eliteRate,
+  }));
+  
+  const tableData: TableData = {
+    columns: [
+      { key: "channel", label: "Channel" },
+      { key: "eliteRate", label: "Elite Rate" },
+      { key: "junkRate", label: "Junk Rate" },
+      { key: "visitors", label: "Total Visitors" },
+      { key: "verdict", label: "Verdict" },
+    ],
+    rows: sorted.map(c => ({
+      channel: c.channel,
+      eliteRate: `${c.eliteRate.toFixed(1)}%`,
+      junkRate: `${c.junkRate.toFixed(1)}%`,
+      visitors: c.totalVisitors.toLocaleString(),
+      verdict: c.verdict,
+    })),
+  };
+  
+  return createMessage(
+    `**Marketing Channel Quality Scorecard**\n\nThe forensic audit reveals massive variance in channel quality:\n\n**High Performers:**\n• **Email (CRM)**: 46.1% Elite Rate — your benchmark for quality\n• **Google Search**: 40.1% Elite Rate — the workhorse, delivering 13.7M visitors at near-CRM quality\n\n**Waste Channels (Fund the Fix):**\n• **Pinterest**: 1.7% Elite / **95.2% Junk** — statistically indistinguishable from bots\n• **Programmatic Display**: 1.6% Elite / 46% Junk — 98.4% of budget wasted\n\nCutting Pinterest and Display waste can fund the Exotic creative build without net-new budget.`,
+    {
+      type: "table",
+      title: "Channel Quality Scorecard",
+      data: tableData,
+    },
+    [
+      { id: "view-waste", label: "View Waste Channels", icon: "settings", action: "refine_audience" },
+      { id: "export-channels", label: "Export Scorecard", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+function handleJunkTraffic(query: string, context: QueryContext): ChatMessage {
+  const lowQuality = getLowQualityChannels();
+  const darkSocial = getDarkSocialMetrics();
+  
+  const chartData: ChartDataPoint[] = lowQuality.map(c => ({
+    label: c.channel,
+    value: c.junkRate,
+  }));
+  
+  const metrics: MetricData[] = [
+    { label: "Pinterest Junk Rate", value: "95.2%", change: -95 },
+    { label: "Programmatic Display Junk", value: "46%", change: -46 },
+    { label: "TikTok Junk Rate", value: "78%", change: -78 },
+    { label: "Unclassified/Dark Social", value: "69.6%", change: -70 },
+  ];
+  
+  return createMessage(
+    `**Low-Quality Traffic Sources — The "Bot Tax"**\n\n🚨 **Critical Finding:** You're paying for traffic that will never convert.\n\n**Pinterest** has a **95.2% Junk Rate** — this suggests the channel is overrun by bots, scrapers, or accidental clicks. A 95% failure rate is statistically anomalous for human traffic.\n\n**Programmatic Display** delivers only **1.6% Elite visitors** — for every 100 clicks you pay for, only 1.6 represent a qualified prospect.\n\n**The "Dark Social" Problem:** ${darkSocial.unclassifiedVisitors.toLocaleString()} visitors are trapped in an "Unclassified" bucket due to tagging failures, with a **${darkSocial.junkRateInUnclassified}% junk rate**. These campaigns are invisible to optimization.\n\n**Recommendation:** Cut these channels to fund the Exotic creative build — this is mathematically risk-free.`,
+    {
+      type: "bar",
+      title: "Junk Traffic Rate by Channel",
+      data: chartData,
+    },
+    [
+      { id: "cut-waste", label: "View Reallocation Plan", icon: "settings", action: "refine_audience" },
+      { id: "export-junk", label: "Export Analysis", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+function handleExoticOpportunity(query: string, context: QueryContext): ChatMessage {
+  const exotic = getExoticOpportunity();
+  const asiaProfiles = getVisitorProfiles().filter(v => v.destinationIntent === "Asia" || v.destinationIntent === "Australia");
+  
+  const metrics: MetricData[] = [
+    { label: "Total Elite Households", value: exotic.totalEliteHouseholds.toLocaleString() },
+    { label: "Avg Propensity Score", value: exotic.avgPropensityScore.toFixed(2) },
+    { label: "Estimated Demand Value", value: `$${(exotic.totalDemandValue / 1000000).toFixed(0)}M` },
+    { label: "Current Match Rate", value: `${exotic.currentMatchRate}%` },
+    { label: "Revenue Leakage", value: "100%" },
+  ];
+  
+  return createMessage(
+    `**The "Exotic" Black Hole — $500M+ Opportunity**\n\n🚨 **Critical Finding:** NCL is sitting on **${exotic.totalEliteHouseholds.toLocaleString()} Elite Households** looking for Asia and Australia cruises, but **100% are receiving generic Caribbean creative**.\n\n**The Numbers:**\n• Asia (Japan): **${exotic.asiaHouseholds.toLocaleString()}** Elite Households\n• Australia: **${exotic.australiaHouseholds.toLocaleString()}** Elite Households\n• Average Propensity Score: **${exotic.avgPropensityScore}** (correlates with cart abandonment — ready to buy)\n\n**The Tragedy:** These visitors have the highest intent in your database. A score of 6.18 means they've selected a ship, picked a cabin, and viewed pricing. They walked up to the counter with a credit card and were ignored.\n\n**Root Cause:** NCL lacks creative assets for Asia/Australia. The system defaults 100% of this high-value traffic to generic Caribbean creative — the marketing equivalent of serving a hot dog to a guest who ordered lobster.\n\n*The model automatically identifies these "Elite" households (Score > 2.25) as new data flows in.*`,
+    {
+      type: "metrics",
+      data: metrics,
+    },
+    [
+      { id: "build-exotic", label: "View Exotic Households", icon: "users", action: "create_audience" },
+      { id: "export-exotic", label: "Export List", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+function handleRelevancePremium(query: string, context: QueryContext): ChatMessage {
+  const premium = getRelevancePremium();
+  
+  const metrics: MetricData[] = [
+    { label: "Matched Creative AOV", value: `$${premium.matchedCreativeAOV.toLocaleString()}` },
+    { label: "Mismatched Creative AOV", value: `$${premium.mismatchedCreativeAOV.toLocaleString()}` },
+    { label: "AOV Lift", value: `+$${premium.aovLift}`, change: premium.aovLiftPercentage },
+    { label: "Lift Percentage", value: `+${premium.aovLiftPercentage}%` },
+  ];
+  
+  const chartData: ChartDataPoint[] = [
+    { label: "Matched Creative", value: premium.matchedCreativeAOV },
+    { label: "Mismatched Creative", value: premium.mismatchedCreativeAOV },
+  ];
+  
+  return createMessage(
+    `**The Relevance Premium — Quantifying the Lift**\n\nTransactional analysis confirms that **creative consistency is a primary driver of AOV and conversion**.\n\n**The Finding:**\n• **Matched Creative AOV:** $${premium.matchedCreativeAOV.toLocaleString()}\n• **Mismatched Creative AOV:** $${premium.mismatchedCreativeAOV.toLocaleString()}\n• **Lift:** +$${premium.aovLift} **(+${premium.aovLiftPercentage}%)**\n\n**The Mechanism:**\nWhen the physical mail piece reinforces the digital intent, it anchors the customer's price expectations and emotional commitment. A mismatch — typically a generic Caribbean card sent to a Europe intender — disrupts the narrative, causing customers to reset expectations to a lower price point.\n\nRelevance isn't just good marketing — it's **$${premium.aovLift} per booking** in your pocket.\n\n*This insight is continuously refined as new transaction data flows into the model.*`,
+    {
+      type: "bar",
+      title: "AOV by Creative Match Status",
+      data: chartData,
+      yKey: "revenue",
+    },
+    [
+      { id: "view-guardrail", label: "View Guardrail Effect", icon: "settings", action: "refine_audience" },
+      { id: "export-premium", label: "Export Analysis", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+function handleGuardrailEffect(query: string, context: QueryContext): ChatMessage {
+  const guardrails = getGuardrailEffects();
+  
+  const tableData: TableData = {
+    columns: [
+      { key: "destination", label: "Destination Intent" },
+      { key: "matchedRetention", label: "Retention w/ Matched Card" },
+      { key: "genericRetention", label: "Retention w/ Generic Card" },
+      { key: "drop", label: "Impact" },
+      { key: "lossPerSwitch", label: "Loss Per Switch" },
+    ],
+    rows: guardrails.map(g => ({
+      destination: g.destination,
+      matchedRetention: `${g.retentionWithMatchedCard}%`,
+      genericRetention: `${g.retentionWithGenericCard}%`,
+      drop: `-${g.retentionDrop} pts`,
+      lossPerSwitch: `$${g.lossPerSwitch.toLocaleString()}`,
+    })),
+  };
+  
+  const hawaii = guardrails.find(g => g.destination === "Hawaii")!;
+  const europe = guardrails.find(g => g.destination === "Europe")!;
+  
+  return createMessage(
+    `**The Guardrail Effect — Value Protection**\n\nThe direct mail piece acts as a **strategic firewall** that prevents high-intent customers from downgrading their vacation ambitions.\n\n**Hawaii Intenders:**\n• With matched card: **${hawaii.retentionWithMatchedCard}%** book Hawaii\n• With generic card: Only **${hawaii.retentionWithGenericCard}%** stay the course\n• **Loss per switch:** $${hawaii.lossPerSwitch.toLocaleString()} (from $${hawaii.retainedAOV.toLocaleString()} → $${hawaii.switchedAOV.toLocaleString()})\n\n**Europe Intenders:**\n• With matched card: **${europe.retentionWithMatchedCard}%** retention\n• With generic card: Collapses to **${europe.retentionWithGenericCard}%**\n• The vast majority abandon their premium intent and "downgrade"\n\n**The Math:** Every time the guardrail fails, NCL loses ~$2,400 per booking. The generic default isn't a "safety net" — it's a leakage point.`,
+    {
+      type: "table",
+      title: "The Guardrail Effect by Destination",
+      data: tableData,
+    },
+    [
+      { id: "view-leakage", label: "Calculate Total Leakage", icon: "settings", action: "refine_audience" },
+      { id: "export-guardrail", label: "Export Analysis", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+function handleVisitorProfiles(query: string, context: QueryContext): ChatMessage {
+  const profiles = getVisitorProfiles();
+  
+  const tableData: TableData = {
+    columns: [
+      { key: "visitorId", label: "Visitor ID" },
+      { key: "destination", label: "Destination Intent" },
+      { key: "score", label: "Propensity Score" },
+      { key: "segment", label: "Quality Segment" },
+      { key: "behavior", label: "Engagement" },
+      { key: "creative", label: "Creative Assignment" },
+    ],
+    rows: profiles.map(p => ({
+      visitorId: p.visitorId,
+      destination: p.destinationIntent,
+      score: p.propensityScore.toFixed(2),
+      segment: p.qualitySegment === 1 ? "1 (Elite)" : `${p.qualitySegment} (${p.qualitySegment === 5 ? "Junk" : "Low"})`,
+      behavior: p.engagementBehavior,
+      creative: p.currentCreativeAssignment === "Matched" ? "✅ Matched" : "❌ Generic",
+    })),
+  };
+  
+  const eliteCount = profiles.filter(p => p.qualitySegment === 1).length;
+  const mismatchedElite = profiles.filter(p => p.qualitySegment === 1 && p.currentCreativeAssignment === "Generic/Caribbean").length;
+  
+  return createMessage(
+    `**High-Intent Visitor Profiles**\n\nThese are sample visitors from your database showing the creative mismatch problem:\n\n**Elite Definition:** Propensity Score > 2.25 (top 1% of conversion probability)\n\n**The Pattern:** Visitors with scores above **6.0** have typically engaged in **cart abandonment** behavior — they selected a ship, picked a cabin, and viewed pricing. They are physically ready to buy.\n\n**The Problem:** ${mismatchedElite} of ${eliteCount} Elite visitors in this sample are receiving **Generic/Caribbean creative** instead of destination-matched assets. These are your hottest leads being ignored at the moment of truth.\n\n*Profiles update automatically as new visitor session data flows in.*`,
+    {
+      type: "table",
+      title: "Sample Visitor Profiles",
+      data: tableData,
+    },
+    [
+      { id: "view-elite", label: "View All Elite Visitors", icon: "users", action: "create_audience" },
+      { id: "export-profiles", label: "Export Profiles", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+function handleRevenueLoss(query: string, context: QueryContext): ChatMessage {
+  const exotic = getExoticOpportunity();
+  const premium = getRelevancePremium();
+  const guardrails = getGuardrailEffects();
+  
+  const europeLeakage = guardrails.find(g => g.destination === "Europe")!;
+  const hawaiiLeakage = guardrails.find(g => g.destination === "Hawaii")!;
+  
+  // Estimate total leakage
+  const exoticLeakage = exotic.totalDemandValue; // ~$505M
+  const europeEstimate = 309034 * 0.37 * premium.aovLift; // Elite HH * retention drop * AOV loss
+  
+  const metrics: MetricData[] = [
+    { label: "Exotic (Asia/Australia) Leakage", value: `$${(exoticLeakage / 1000000).toFixed(0)}M+` },
+    { label: "AOV Loss Per Mismatch", value: `$${premium.aovLift}` },
+    { label: "Hawaii Loss Per Switch", value: `$${hawaiiLeakage.lossPerSwitch.toLocaleString()}` },
+    { label: "Europe Retention Drop", value: `-${europeLeakage.retentionDrop} pts` },
+  ];
+  
+  return createMessage(
+    `**Revenue Leakage Analysis — The Cost of Mismatch**\n\n🚨 **Total Identified Leakage: $400M+**\n\n**The Exotic Black Hole:**\n• ${exotic.totalEliteHouseholds.toLocaleString()} Elite households for Asia/Australia\n• 100% receiving generic creative = **$${(exoticLeakage / 1000000).toFixed(0)}M+ gross demand ignored**\n\n**The Relevance Tax:**\n• Every mismatched creative costs **$${premium.aovLift}** in AOV\n• Hawaii switchers lose **$${hawaiiLeakage.lossPerSwitch.toLocaleString()}** per booking\n• Europe retention collapses from ${europeLeakage.retentionWithMatchedCard}% → ${europeLeakage.retentionWithGenericCard}%\n\n**The Path to Recovery:**\nThis isn't a demand problem — it's a **routing and execution problem**. The customers are present, their intent is high (Score 6.18), and their wallets are open. The barrier is the routing logic that sends a Japan-intender a Caribbean postcard.\n\n*The model continuously tracks these leakage patterns as new data flows in.*`,
+    {
+      type: "metrics",
+      data: metrics,
+    },
+    [
+      { id: "view-fix", label: "View Recovery Plan", icon: "rocket", action: "launch_campaign" },
+      { id: "export-leakage", label: "Export Analysis", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+function handlePurchaseIntentByDestination(query: string, context: QueryContext): ChatMessage {
+  const destinations = getDestinationQuality();
+  const households = getEliteHouseholds();
+  
+  // Sort by propensity score
+  const sorted = [...households].sort((a, b) => b.avgPropensityScore - a.avgPropensityScore);
+  
+  const chartData: ChartDataPoint[] = sorted.map(h => ({
+    label: h.destination,
+    value: h.avgPropensityScore,
+  }));
+  
+  return createMessage(
+    `**Purchase Intent by Destination**\n\nThe E-Commerce Propensity Model reveals which destinations attract the **highest-intent visitors**:\n\n**Top Intent Destinations:**\n1. **Asia (Japan)**: Score **6.18** — Cart abandoners ready to book\n2. **Australia**: Score **6.18** — Same high-intent behavior\n3. **Caribbean (Generic)**: Score **4.35** — High volume, moderate intent\n4. **Hawaii**: Score **4.20** — Strong intent with some matched creative\n5. **Alaska**: Score **3.80** — Good intent, strong baseline loyalty\n\n**The 6.18 Insight:** This extreme score correlates with "Cart Abandonment" behaviors. These visitors aren't dreamers — they're customers who walked up to the counter with a credit card.\n\n**The Tragedy:** The highest-intent destinations (Asia/Australia) have **0% creative match**, while the lowest-intent traffic (Caribbean generic) gets 100% match.`,
+    {
+      type: "bar",
+      title: "Average Propensity Score by Destination",
+      data: chartData,
+    },
+    [
+      { id: "view-exotic", label: "View Exotic Opportunity", icon: "users", action: "create_audience" },
+      { id: "export-intent", label: "Export Analysis", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+function handleDarkSocial(query: string, context: QueryContext): ChatMessage {
+  const darkSocial = getDarkSocialMetrics();
+  
+  const metrics: MetricData[] = [
+    { label: "Unclassified Visitors", value: `${(darkSocial.unclassifiedVisitors / 1000000).toFixed(1)}M` },
+    { label: "Junk Rate (Unclassified)", value: `${darkSocial.junkRateInUnclassified}%` },
+    { label: "Generic Tagging Rate", value: `${darkSocial.genericTaggingRate}%` },
+    { label: "Tagged Campaign Score", value: darkSocial.taggedCampaignScoreAvg.toFixed(2) },
+    { label: "Untagged Campaign Score", value: darkSocial.untaggedCampaignScoreAvg.toFixed(2) },
+  ];
+  
+  return createMessage(
+    `**The "Dark Social" Crisis — Data Governance Failure**\n\n🚨 **${(darkSocial.unclassifiedVisitors / 1000000).toFixed(1)} Million visitors** are trapped in an "Unclassified" bucket due to tagging failures.\n\n**The Problem:**\n• Agencies are using non-standard tags, bypassing the PM_ (Paid Social) naming convention\n• **${darkSocial.junkRateInUnclassified}% junk rate** in unclassified traffic — millions of dollars likely wasted on low-quality social impressions\n• Because this traffic is unclassified, it **cannot be optimized**\n\n**The Governance Gap:**\n• **${darkSocial.genericTaggingRate}%** of agency traffic is tagged as "Generic" (no Product/Region metadata)\n• When agencies DO use proper tags, scores jump from **${darkSocial.untaggedCampaignScoreAvg}** to **${darkSocial.taggedCampaignScoreAvg}** — accurate tagging nearly doubles visibility of high-intent behaviors\n\n**The Fix:** Enforce the tagging mandate. We cannot target what we do not tag.\n\n*The model automatically flags tagging anomalies as data flows in.*`,
+    {
+      type: "metrics",
+      data: metrics,
+    },
+    [
+      { id: "view-tagging", label: "View Tagging Audit", icon: "settings", action: "refine_audience" },
+      { id: "export-dark", label: "Export Analysis", icon: "download", action: "export_csv" },
+    ]
+  );
+}
+
+function handleMarketingReadiness(query: string, context: QueryContext): ChatMessage {
+  const exotic = getExoticOpportunity();
+  const households = getEliteHouseholds();
+  const europe = households.find(h => h.destination === "Europe")!;
+  
+  const tableData: TableData = {
+    columns: [
+      { key: "destination", label: "Destination" },
+      { key: "eliteHouseholds", label: "Ready for Outreach" },
+      { key: "score", label: "Avg Intent Score" },
+      { key: "conversion", label: "Est. Conversion Rate" },
+      { key: "status", label: "Creative Status" },
+    ],
+    rows: [
+      { destination: "Europe", eliteHouseholds: "309,034", score: "0.25*", conversion: "5-7%", status: "🟡 Partial (15%)" },
+      { destination: "Asia (Japan)", eliteHouseholds: "74,735", score: "6.18", conversion: "8-12%", status: "🔴 None (0%)" },
+      { destination: "Alaska", eliteHouseholds: "62,000", score: "3.80", conversion: "6-8%", status: "🟢 Good (72%)" },
+      { destination: "Hawaii", eliteHouseholds: "45,000", score: "4.20", conversion: "7-9%", status: "🟢 Good (65%)" },
+      { destination: "Australia", eliteHouseholds: "26,418", score: "6.18", conversion: "8-12%", status: "🔴 None (0%)" },
+    ],
+  };
+  
+  const totalReady = 309034 + 74735 + 62000 + 45000 + 26418;
+  
+  return createMessage(
+    `**Marketing Readiness Analysis**\n\nYou have **${totalReady.toLocaleString()} Elite households** ready for targeted outreach — visitors whose digital behavior indicates high purchase intent.\n\n**Immediate Opportunities:**\n\n**🔴 Asia + Australia (101,153 households)**\n• Propensity Score: **6.18** (cart abandoners)\n• Est. Conversion: **8-12%** with matched creative\n• Status: **0% matched creative** — 100% leakage\n• Action: Build Asia/Australia creative assets immediately\n\n**🟡 Europe (309,034 households)**\n• Lower funnel: ~20,000 "ready now"\n• Status: Only **15% matched** creative\n• Action: Europe Pilot — force Europe creative for test cohort\n\n*Note: Europe shows lower avg score (0.25) due to higher upper-funnel volume; the Asia/Australia traffic is concentrated at bottom of funnel.*\n\n*Elite household counts update automatically as new visitor data flows in.*`,
+    {
+      type: "table",
+      title: "Customers Ready for Marketing Outreach",
+      data: tableData,
+    },
+    [
+      { id: "build-exotic-audience", label: "Build Exotic Audience", icon: "users", action: "create_audience" },
+      { id: "launch-europe-pilot", label: "Launch Europe Pilot", icon: "rocket", action: "launch_campaign" },
+      { id: "export-ready", label: "Export Analysis", icon: "download", action: "export_csv" },
+    ]
   );
 }
 

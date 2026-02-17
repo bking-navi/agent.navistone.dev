@@ -15,7 +15,7 @@ export default function Home() {
             </div>
             <div>
               <h1 className="font-semibold">NaviStone Analytics</h1>
-              <p className="text-xs text-muted-foreground">AI-powered insights for your campaigns</p>
+              <p className="text-xs text-muted-foreground">Continuously learning from NCL's CID and transaction data</p>
             </div>
           </div>
         </header>

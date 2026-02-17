@@ -28,15 +28,15 @@ const typeConfig = {
   },
 };
 
-// Special config for action-oriented insights
+// Special config for action-oriented insights (NCL CID)
 const actionInsightConfig: Record<string, { icon: React.ElementType; gradient: string }> = {
-  "insight-funnel": { 
+  "insight-exotic": { 
     icon: BarChart3, 
-    gradient: "from-blue-500/10 to-violet-500/10 dark:from-blue-500/20 dark:to-violet-500/20" 
+    gradient: "from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20" 
   },
-  "insight-audience": { 
+  "insight-channels": { 
     icon: Filter, 
-    gradient: "from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20" 
+    gradient: "from-blue-500/10 to-violet-500/10 dark:from-blue-500/20 dark:to-violet-500/20" 
   },
 };
 

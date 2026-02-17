@@ -40,12 +40,68 @@ export interface Campaign {
 }
 
 // Enums / union types
-export type Itinerary = "Caribbean" | "Alaska" | "Europe" | "Mediterranean";
+export type Itinerary = "Caribbean" | "Alaska" | "Europe" | "Mediterranean" | "Hawaii" | "Asia" | "Australia";
 export type CabinType = "Inside" | "Ocean View" | "Balcony" | "Suite";
 export type CampaignType = "Prospecting" | "Reactivation" | "Retargeting";
-export type MarketingChannel = "Direct Mail" | "Email" | "Display";
+export type MarketingChannel = "Direct Mail" | "Email" | "Display" | "Paid Search" | "Organic Search" | "Pinterest" | "Programmatic Display" | "TikTok";
 export type AcquisitionChannel = "Direct Mail" | "Email" | "Organic" | "Referral" | "Paid Search";
 export type CustomerSegment = "Prospect" | "Active" | "Lapsed" | "VIP";
+export type QualitySegment = 1 | 2 | 3 | 4 | 5; // 1 = Elite/High Intent, 5 = Junk
+
+// NCL CID Types - Visitor Intent Data
+export interface EliteHousehold {
+  destination: Itinerary;
+  eliteHouseholds: number;
+  avgPropensityScore: number;
+  currentCreativeStrategy: "Matched" | "Generic/Caribbean (Mismatch)";
+  estimatedDemandValue: number;
+}
+
+export interface ChannelQuality {
+  channel: MarketingChannel | "Email (CRM)" | "Google Search" | "Bing Search";
+  eliteRate: number;      // % with Score > 2.25 (Buyers)
+  junkRate: number;       // % with Score < 0.10 (Bots/Bouncers)
+  totalVisitors: number;
+  verdict: "Benchmark" | "High Performance" | "Good" | "Waste/Cut" | "Waste/Kill" | "Low Quality";
+}
+
+export interface DestinationQuality {
+  destination: Itinerary;
+  eliteHouseholds: number;
+  avgPropensityScore: number;
+  retentionWithMatchedCreative: number;  // % retention
+  retentionWithGenericCreative: number;  // % retention
+  matchedAOV: number;
+  mismatchedAOV: number;
+  currentMatchRate: number;  // % currently receiving matched creative
+}
+
+export interface VisitorProfile {
+  visitorId: string;
+  destinationIntent: Itinerary;
+  propensityScore: number;
+  qualitySegment: QualitySegment;
+  engagementBehavior: "Cart Abandonment" | "Deck Plan View" | "Itinerary Browse" | "Price Check" | "Bounce";
+  sourceChannel: MarketingChannel | "Email (CRM)" | "Google Search" | "Bing Search";
+  currentCreativeAssignment: "Matched" | "Generic/Caribbean";
+}
+
+export interface RelevancePremium {
+  matchedCreativeAOV: number;
+  mismatchedCreativeAOV: number;
+  aovLift: number;
+  aovLiftPercentage: number;
+}
+
+export interface GuardrailEffect {
+  destination: Itinerary;
+  retentionWithMatchedCard: number;
+  retentionWithGenericCard: number;
+  retentionDrop: number;
+  retainedAOV: number;
+  switchedAOV: number;
+  lossPerSwitch: number;
+}
 
 // Chat types
 export interface ChatMessage {

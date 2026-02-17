@@ -22,7 +22,7 @@ function analyzeAudience(customers: Customer[]) {
   
   // Count itinerary preferences
   const itineraryCounts: Record<Itinerary, number> = {
-    Caribbean: 0, Alaska: 0, Europe: 0, Mediterranean: 0
+    Caribbean: 0, Alaska: 0, Europe: 0, Mediterranean: 0, Hawaii: 0, Asia: 0, Australia: 0
   };
   customers.forEach(c => itineraryCounts[c.preferredItinerary]++);
   const dominantItinerary = (Object.entries(itineraryCounts) as [Itinerary, number][])
@@ -72,6 +72,9 @@ function generateMessaging(analysis: ReturnType<typeof analyzeAudience>): string
     Alaska: "wildlife and glacier scenery with adventure experiences",
     Europe: "cultural immersion and historic port destinations",
     Mediterranean: "coastal elegance with food and wine experiences",
+    Hawaii: "island paradise with volcanic landscapes and Polynesian culture",
+    Asia: "bucket-list cultural immersion with Japan highlights",
+    Australia: "adventure and exploration with iconic landscapes",
   };
   messages.push(`Highlight ${itineraryMessages[analysis.dominantItinerary]}`);
   

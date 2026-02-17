@@ -1,184 +1,220 @@
-import type { ChatMessage, Insight, ChartDataPoint, TableData } from "@/types";
+import type { ChatMessage, Insight, ChartDataPoint, TableData, MetricData } from "@/types";
 import * as queryEngine from "@/lib/data/query-engine";
-import { getChurnRiskCustomers } from "@/lib/data/query-engine";
+import { getChurnRiskCustomers, getRelevancePremium, getGuardrailEffects, getChannelQuality, getExoticOpportunity, getDarkSocialMetrics } from "@/lib/data/query-engine";
 
 /**
  * Generate a pre-built response for a specific insight.
  * This makes clicking an insight feel like the AI is proactively sharing what it found.
+ * Updated with NCL CID forensic audit findings.
  */
 export function getInsightResponse(insight: Insight): ChatMessage {
   const id = insight.id;
   
-  // Match insight to its detailed response
-  if (id === "insight-001" || insight.title.toLowerCase().includes("caribbean") && insight.title.toLowerCase().includes("down")) {
-    return getCaribbeanDownResponse(insight);
+  // NCL CID Insights
+  if (id === "insight-001" || insight.title.toLowerCase().includes("pinterest")) {
+    return getPinterestJunkResponse(insight);
   }
   
-  if (id === "insight-002" || insight.title.toLowerCase().includes("suite")) {
-    return getSuiteConversionResponse(insight);
+  if (id === "insight-002" || insight.title.toLowerCase().includes("leakage") || insight.title.toLowerCase().includes("asia")) {
+    return getExoticLeakageResponse(insight);
   }
   
-  if (id === "insight-003" || insight.title.toLowerCase().includes("reactivation")) {
-    return getReactivationResponse(insight);
+  if (id === "insight-003" || insight.title.toLowerCase().includes("relevance") || insight.title.toLowerCase().includes("aov")) {
+    return getRelevancePremiumResponse(insight);
   }
   
-  if (id === "insight-004" || insight.title.toLowerCase().includes("churn")) {
-    return getChurnRiskResponse(insight);
+  if (id === "insight-004" || insight.title.toLowerCase().includes("hawaii") || insight.title.toLowerCase().includes("guardrail")) {
+    return getHawaiiGuardrailResponse(insight);
   }
   
-  if (id === "insight-005" || insight.title.toLowerCase().includes("revenue") && insight.title.toLowerCase().includes("target")) {
-    return getRevenueAheadResponse(insight);
+  if (id === "insight-005" || insight.title.toLowerCase().includes("google") || insight.title.toLowerCase().includes("elite")) {
+    return getGoogleSearchResponse(insight);
   }
   
-  if (id === "insight-006" || insight.title.toLowerCase().includes("alaska")) {
-    return getAlaskaMomentumResponse(insight);
+  if (id === "insight-006" || insight.title.toLowerCase().includes("dark") || insight.title.toLowerCase().includes("unclassified")) {
+    return getDarkSocialResponse(insight);
   }
   
   // Fallback generic response
   return {
     id: `insight-${Date.now()}`,
     role: "assistant",
-    content: `I noticed ${insight.title.toLowerCase()}. ${insight.description}`,
+    content: `I noticed ${insight.title.toLowerCase()}. ${insight.description}\n\n*This analysis is continuously refined as new CID and transaction data flows in.*`,
     timestamp: new Date(),
   };
 }
 
-function getCaribbeanDownResponse(insight: Insight): ChatMessage {
-  const roasData = queryEngine.getROASByItinerary();
+function getPinterestJunkResponse(insight: Insight): ChatMessage {
+  const channels = getChannelQuality();
+  const pinterest = channels.find(c => c.channel === "Pinterest");
+  const display = channels.find(c => c.channel === "Programmatic Display");
+  
+  const chartData: ChartDataPoint[] = [
+    { label: "Pinterest", value: pinterest?.junkRate || 95.2 },
+    { label: "Programmatic Display", value: display?.junkRate || 46 },
+    { label: "TikTok", value: 78 },
+    { label: "Google Search", value: 27 },
+    { label: "Email (CRM)", value: 36 },
+  ];
   
   return {
     id: `insight-${Date.now()}`,
     role: "assistant",
-    content: `I wanted to flag this — Caribbean bookings dropped 23% compared to our 4-week average. This is unusual since Caribbean is typically our strongest performer.\n\nLooking at possible causes: our last Caribbean-focused campaign ended 2 weeks ago, and we haven't had a follow-up. Competitors may also be running aggressive promotions.\n\nI'd recommend launching a Caribbean retargeting campaign to site visitors from the past 30 days — they've shown intent but haven't converted.`,
-    timestamp: new Date(),
-    visualization: {
-      type: "bar",
-      title: "ROAS by Itinerary (for context)",
-      data: roasData,
-      yKey: "roas",
-    },
-    actions: [
-      { id: "caribbean-retarget", label: "Create Caribbean Retargeting Audience", icon: "users", action: "create_audience" },
-    ],
-  };
-}
-
-function getSuiteConversionResponse(insight: Insight): ChatMessage {
-  const cabinData = queryEngine.getRevenueByCabinType();
-  
-  return {
-    id: `insight-${Date.now()}`,
-    role: "assistant",
-    content: `Good news — Suite cabin bookings hit a 90-day high, reaching 12.4% of total bookings (up from our usual 8.1%). This is driving revenue up since Suites have 2.3x higher AOV.\n\nThe Mediterranean campaigns seem to be the driver — they're attracting a more premium customer. This might be worth leaning into with Suite-specific creative.`,
+    content: `🚨 **Critical Finding: Pinterest Traffic is 95.2% Junk**\n\nThe forensic audit reveals that Pinterest is statistically irrelevant to revenue generation. For every 100 clicks you pay for, only 1.7 represent a qualified prospect.\n\n**The Data:**\n• Pinterest: **95.2% Junk Rate** — statistically anomalous for human traffic\n• Programmatic Display: **46% Junk Rate** — 98.4% of budget wasted\n\n**What "Junk" Means:** Visitors with Propensity Score < 0.10 — near-zero engagement, statistically indistinguishable from bots, accidental clicks, or immediate bounces.\n\n**Recommendation:** Cut these channels immediately. The savings can fund the Exotic creative build without asking for net-new budget. This is mathematically risk-free.\n\n*The model continuously monitors channel quality as new visitor data flows in.*`,
     timestamp: new Date(),
     visualization: {
       type: "bar",
-      title: "Revenue by Cabin Type",
-      data: cabinData.map(d => ({ ...d, value: Math.round(d.value / 1000) })),
-      yKey: "revenue",
+      title: "Junk Traffic Rate by Channel",
+      data: chartData,
     },
     actions: [
-      { id: "suite-audience", label: "Create Suite Prospects Audience", icon: "users", action: "create_audience" },
-      { id: "export-suite", label: "Export Data", icon: "download", action: "export_csv" },
+      { id: "view-scorecard", label: "View Full Scorecard", icon: "settings", action: "refine_audience" },
+      { id: "export-junk", label: "Export Analysis", icon: "download", action: "export_csv" },
     ],
   };
 }
 
-function getReactivationResponse(insight: Insight): ChatMessage {
-  const campaignData = queryEngine.getROASByCampaignType();
+function getExoticLeakageResponse(insight: Insight): ChatMessage {
+  const exotic = getExoticOpportunity();
+  
+  const metrics: MetricData[] = [
+    { label: "Asia Elite Households", value: exotic.asiaHouseholds.toLocaleString() },
+    { label: "Australia Elite Households", value: exotic.australiaHouseholds.toLocaleString() },
+    { label: "Avg Propensity Score", value: exotic.avgPropensityScore.toFixed(2) },
+    { label: "Current Match Rate", value: "0%" },
+    { label: "Estimated Demand", value: `$${(exotic.totalDemandValue / 1000000).toFixed(0)}M+` },
+  ];
   
   return {
     id: `insight-${Date.now()}`,
     role: "assistant",
-    content: `Here's something worth acting on — Reactivation campaigns are delivering 2.1x higher ROAS than Prospecting right now. This makes sense: past customers already trust the brand and know what to expect.\n\nIf you have budget flexibility, shifting 10-15% from Prospecting to Reactivation could meaningfully improve overall efficiency. I can help identify the best reactivation targets.`,
-    timestamp: new Date(),
-    visualization: {
-      type: "bar",
-      title: "ROAS by Campaign Type",
-      data: campaignData,
-      yKey: "roas",
-    },
-    actions: [
-      { id: "create-reactivation", label: "Create Reactivation Audience", icon: "users", action: "create_audience" },
-    ],
-  };
-}
-
-function getChurnRiskResponse(insight: Insight): ChatMessage {
-  const churnCustomers = getChurnRiskCustomers(18);
-  
-  const tableData: TableData = {
-    columns: [
-      { key: "name", label: "Customer" },
-      { key: "loyaltyTier", label: "Tier" },
-      { key: "lifetimeValue", label: "LTV" },
-      { key: "lastCruiseDate", label: "Last Cruise" },
-      { key: "preferredItinerary", label: "Preferred" },
-    ],
-    rows: churnCustomers.slice(0, 8).map((c) => ({
-      name: `${c.firstName} ${c.lastName}`,
-      loyaltyTier: c.loyaltyTier,
-      lifetimeValue: c.lifetimeValue,
-      lastCruiseDate: c.lastCruiseDate,
-      preferredItinerary: c.preferredItinerary,
-    })),
-  };
-
-  return {
-    id: `insight-${Date.now()}`,
-    role: "assistant",
-    content: `Heads up — I found ${churnCustomers.length} customers who haven't cruised in 18+ months and have meaningful lifetime value. These are people who used to sail with you regularly but have gone quiet.\n\nThe good news: lapsed customers often respond well to personalized win-back offers, especially if you can match their preferred itinerary. Here are some of the highest-value ones:`,
-    timestamp: new Date(),
-    visualization: {
-      type: "table",
-      title: "High Churn Risk Customers",
-      data: tableData,
-    },
-    actions: [
-      { id: "create-winback", label: `Create Win-Back Audience (${churnCustomers.length})`, icon: "users", action: "create_audience" },
-      { id: "export-churn", label: "Export Full List", icon: "download", action: "export_csv" },
-    ],
-  };
-}
-
-function getRevenueAheadResponse(insight: Insight): ChatMessage {
-  const metrics = queryEngine.getOverallMetrics();
-  
-  return {
-    id: `insight-${Date.now()}`,
-    role: "assistant",
-    content: `Great start to Q1 — we're tracking 18% ahead of last year's pace. Direct Mail is doing the heavy lifting, with Reactivation campaigns particularly strong.\n\nThe Suite cabin mix is also up, which is boosting average order value. If this trend holds, we're looking at a strong quarter.`,
+    content: `🚨 **The "Exotic" Black Hole: 100% Revenue Leakage**\n\nThe most alarming finding: **Zero instances** in the transaction logs where an Asia or Australia ad click resulted in a booking supported by a matched destination postcard.\n\n**The Numbers:**\n• **${exotic.totalEliteHouseholds.toLocaleString()} Elite Households** for Asia + Australia\n• **Propensity Score: 6.18** — these are cart abandoners ready to buy\n• **$${(exotic.totalDemandValue / 1000000).toFixed(0)}M+ gross demand** being ignored\n\n**Root Cause:** This isn't a demand failure — it's an **asset failure**. NCL lacks creative assets for Asia/Australia. The system defaults 100% of this high-value traffic to generic Caribbean creative.\n\n**The Tragedy:** You're paying to acquire international travelers and then actively selling them a product they didn't ask for. These visitors have the highest intent in your database.\n\n*Elite household counts update automatically as new visitor data flows in.*`,
     timestamp: new Date(),
     visualization: {
       type: "metrics",
-      data: [
-        { label: "Total Bookings", value: metrics.totalBookings },
-        { label: "Attributed Bookings", value: metrics.attributedBookings },
-        { label: "Overall ROAS", value: `${metrics.overallROAS}x` },
-        { label: "Avg Order Value", value: `$${metrics.averageOrderValue.toLocaleString()}` },
-      ],
+      data: metrics,
     },
     actions: [
-      { id: "export-summary", label: "Export Summary", icon: "download", action: "export_csv" },
+      { id: "build-exotic", label: "View Exotic Households", icon: "users", action: "create_audience" },
+      { id: "export-exotic", label: "Export List", icon: "download", action: "export_csv" },
     ],
   };
 }
 
-function getAlaskaMomentumResponse(insight: Insight): ChatMessage {
-  const bookingsData = queryEngine.getBookingsByItinerary();
+function getRelevancePremiumResponse(insight: Insight): ChatMessage {
+  const premium = getRelevancePremium();
+  
+  const chartData: ChartDataPoint[] = [
+    { label: "Matched Creative", value: premium.matchedCreativeAOV },
+    { label: "Mismatched Creative", value: premium.mismatchedCreativeAOV },
+  ];
   
   return {
     id: `insight-${Date.now()}`,
     role: "assistant",
-    content: `Alaska is building momentum — bookings for the May-August season are up 31% compared to this time last year. The early bird campaign is working.\n\nThis is a good sign, but Alaska still has the lowest ROAS overall due to cabin mix (heavy on Inside cabins). Consider testing Balcony upgrade offers in the next campaign to improve margins.`,
+    content: `**The Relevance Premium: +$${premium.aovLift} AOV Lift Confirmed**\n\nTransactional analysis proves that **creative consistency is a primary driver of AOV**.\n\n**The Finding:**\n• Matched Creative AOV: **$${premium.matchedCreativeAOV.toLocaleString()}**\n• Mismatched Creative AOV: **$${premium.mismatchedCreativeAOV.toLocaleString()}**\n• Lift: **+$${premium.aovLift} (+${premium.aovLiftPercentage}%)**\n\n**The Mechanism:**\nWhen a consumer sees a digital ad for "Hawaii," they form a specific price anchor (~$5,500). If the follow-up mail piece features Hawaii, it reinforces this high-value anchor.\n\nIf it features generic Caribbean (often priced at $799), it disrupts the value perception, causing the consumer to re-evaluate their budget downward.\n\nRelevance isn't a nice-to-have — it's **$${premium.aovLift} per booking** in your pocket.\n\n*This insight is continuously refined as new transaction data flows into the model.*`,
     timestamp: new Date(),
     visualization: {
       type: "bar",
-      title: "Bookings by Itinerary",
-      data: bookingsData,
+      title: "AOV by Creative Match Status",
+      data: chartData,
+      yKey: "revenue",
     },
     actions: [
-      { id: "alaska-upgrade", label: "Create Alaska Upgrade Audience", icon: "users", action: "create_audience" },
+      { id: "view-guardrail", label: "View Guardrail Effect", icon: "settings", action: "refine_audience" },
+      { id: "export-premium", label: "Export Analysis", icon: "download", action: "export_csv" },
+    ],
+  };
+}
+
+function getHawaiiGuardrailResponse(insight: Insight): ChatMessage {
+  const guardrails = getGuardrailEffects();
+  const hawaii = guardrails.find(g => g.destination === "Hawaii")!;
+  
+  const tableData: TableData = {
+    columns: [
+      { key: "destination", label: "Destination Intent" },
+      { key: "matched", label: "w/ Matched Card" },
+      { key: "generic", label: "w/ Generic Card" },
+      { key: "drop", label: "Retention Drop" },
+      { key: "loss", label: "Loss Per Switch" },
+    ],
+    rows: guardrails.map(g => ({
+      destination: g.destination,
+      matched: `${g.retentionWithMatchedCard}%`,
+      generic: `${g.retentionWithGenericCard}%`,
+      drop: `-${g.retentionDrop} pts`,
+      loss: `$${g.lossPerSwitch.toLocaleString()}`,
+    })),
+  };
+  
+  return {
+    id: `insight-${Date.now()}`,
+    role: "assistant",
+    content: `**The Guardrail Effect: Hawaii Retention Collapses 70% → 15%**\n\nThe direct mail piece acts as a **strategic firewall** that prevents high-intent customers from downgrading their vacation ambitions.\n\n**Hawaii Intenders:**\n• With matched Hawaii card: **${hawaii.retentionWithMatchedCard}%** book Hawaii\n• With generic Caribbean card: Only **${hawaii.retentionWithGenericCard}%** stay the course\n• Sending a generic card makes them **4.5x more likely to abandon Hawaii**\n\n**The Cost of Switching:**\n• Hawaii booking AOV: **$${hawaii.retainedAOV.toLocaleString()}**\n• Switched to Caribbean: **$${hawaii.switchedAOV.toLocaleString()}**\n• **Loss per switch: $${hawaii.lossPerSwitch.toLocaleString()}**\n\nThe generic default isn't a "safety net" — it's a leakage point.\n\n*Retention patterns update automatically as new booking data flows in.*`,
+    timestamp: new Date(),
+    visualization: {
+      type: "table",
+      title: "The Guardrail Effect by Destination",
+      data: tableData,
+    },
+    actions: [
+      { id: "calculate-leakage", label: "Calculate Total Leakage", icon: "settings", action: "refine_audience" },
+      { id: "export-guardrail", label: "Export Analysis", icon: "download", action: "export_csv" },
+    ],
+  };
+}
+
+function getGoogleSearchResponse(insight: Insight): ChatMessage {
+  const channels = getChannelQuality();
+  const google = channels.find(c => c.channel === "Google Search")!;
+  const email = channels.find(c => c.channel === "Email (CRM)")!;
+  
+  const chartData: ChartDataPoint[] = channels
+    .filter(c => c.verdict === "Benchmark" || c.verdict === "High Performance" || c.verdict === "Good")
+    .sort((a, b) => b.eliteRate - a.eliteRate)
+    .map(c => ({ label: c.channel, value: c.eliteRate }));
+  
+  return {
+    id: `insight-${Date.now()}`,
+    role: "assistant",
+    content: `**Google Search: The Workhorse Channel**\n\nGoogle Search is delivering exceptional performance — **${google.eliteRate}% Elite Rate** at massive scale (${google.totalVisitors.toLocaleString()} visitors).\n\n**The Benchmark:**\n• Email (CRM): **${email.eliteRate}%** Elite Rate — your known customers\n• Google Search: **${google.eliteRate}%** Elite Rate — nearly matches CRM quality!\n\n**Why This Matters:**\nGoogle is driving volume AND quality. This channel should be **protected** from budget cuts. It's one of the few paid channels that delivers intent-qualified traffic at scale.\n\n**Contrast with Waste Channels:**\n• Pinterest: 1.7% Elite / 95% Junk\n• Programmatic Display: 1.6% Elite / 46% Junk\n\nGoogle proves that quality at scale is achievable — the problem is channel allocation, not paid media fundamentals.\n\n*Channel quality scores update automatically as new visitor data flows in.*`,
+    timestamp: new Date(),
+    visualization: {
+      type: "bar",
+      title: "Elite Buyer Rate by Channel (High Performers)",
+      data: chartData,
+    },
+    actions: [
+      { id: "view-scorecard", label: "View Full Scorecard", icon: "settings", action: "refine_audience" },
+      { id: "export-channels", label: "Export Analysis", icon: "download", action: "export_csv" },
+    ],
+  };
+}
+
+function getDarkSocialResponse(insight: Insight): ChatMessage {
+  const darkSocial = getDarkSocialMetrics();
+  
+  const metrics: MetricData[] = [
+    { label: "Unclassified Visitors", value: `${(darkSocial.unclassifiedVisitors / 1000000).toFixed(1)}M` },
+    { label: "Junk Rate in Bucket", value: `${darkSocial.junkRateInUnclassified}%` },
+    { label: "Generic Tagging Rate", value: `${darkSocial.genericTaggingRate}%` },
+    { label: "Tagged Campaign Score", value: darkSocial.taggedCampaignScoreAvg.toFixed(2) },
+    { label: "Untagged Score", value: darkSocial.untaggedCampaignScoreAvg.toFixed(2) },
+  ];
+  
+  return {
+    id: `insight-${Date.now()}`,
+    role: "assistant",
+    content: `**The "Dark Social" Crisis: 19.2M Visitors Invisible**\n\nA deeper audit revealed that **${(darkSocial.unclassifiedVisitors / 1000000).toFixed(1)} Million visitors** are trapped in an "Unclassified" bucket due to tagging failures.\n\n**The Problem:**\n• Agencies are using non-standard tags, bypassing the PM_ (Paid Social) naming convention\n• This traffic has a **${darkSocial.junkRateInUnclassified}% junk rate** — millions being wasted on low-quality impressions\n• Because it's unclassified, these campaigns are **invisible to optimization**\n\n**The Governance Gap:**\n• **${darkSocial.genericTaggingRate}%** of all agency traffic is tagged "Generic"\n• When agencies DO use proper tags (e.g., ABC for Abandoned Cart), scores jump from **${darkSocial.untaggedCampaignScoreAvg}** to **${darkSocial.taggedCampaignScoreAvg}**\n• Accurate tagging nearly **doubles** visibility of high-intent behaviors\n\n**The Fix:** Enforce the tagging mandate. We cannot target what we do not tag. High-definition buyers are being treated with standard-definition marketing.\n\n*Tagging anomalies are automatically flagged as new data flows in.*`,
+    timestamp: new Date(),
+    visualization: {
+      type: "metrics",
+      data: metrics,
+    },
+    actions: [
+      { id: "audit-tags", label: "View Tagging Audit", icon: "settings", action: "refine_audience" },
+      { id: "export-dark", label: "Export Analysis", icon: "download", action: "export_csv" },
     ],
   };
 }

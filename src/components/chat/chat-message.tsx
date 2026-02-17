@@ -10,6 +10,7 @@ import { FunnelChart } from "@/components/analytics/funnel-chart";
 import { AudiencePreview } from "@/components/analytics/audience-preview";
 import { ActionButtons } from "./action-buttons";
 import { User, Bot } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import type { ChatMessage as ChatMessageType, ActionButton, ChartDataPoint, MetricData, TableData, FunnelStage, AudiencePreviewData } from "@/types";
 
 interface ChatMessageProps {
@@ -37,10 +38,23 @@ export function ChatMessage({ message, onAction }: ChatMessageProps) {
           <Card className="max-w-full">
             <CardContent className="p-4 space-y-4">
               {/* Text content */}
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                {message.content.split("\n").map((line, i) => (
-                  <p key={i} className="mb-2 last:mb-0">{line}</p>
-                ))}
+              <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                <ReactMarkdown
+                  components={{
+                    // Custom styling for markdown elements
+                    p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+                    strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+                    ul: ({ children }) => <ul className="list-disc pl-4 mb-3 space-y-1">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-3 space-y-1">{children}</ol>,
+                    li: ({ children }) => <li className="text-sm">{children}</li>,
+                    h1: ({ children }) => <h1 className="text-lg font-semibold mb-2 mt-4 first:mt-0">{children}</h1>,
+                    h2: ({ children }) => <h2 className="text-base font-semibold mb-2 mt-3 first:mt-0">{children}</h2>,
+                    h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 mt-2 first:mt-0">{children}</h3>,
+                    code: ({ children }) => <code className="bg-muted px-1 py-0.5 rounded text-xs">{children}</code>,
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
               </div>
 
               {/* Visualization */}

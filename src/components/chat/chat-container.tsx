@@ -119,32 +119,32 @@ export function ChatContainer() {
     const title = insight.title.toLowerCase();
     const id = insight.id;
     
-    // Action-oriented insights
-    if (id === "insight-funnel") {
-      return "Show me the conversion funnel";
+    // Action-oriented insights (NCL CID)
+    if (id === "insight-exotic") {
+      return "Show me the Exotic opportunity (Asia/Australia)";
     }
-    if (id === "insight-audience") {
-      return "Show me reactivation opportunities";
+    if (id === "insight-channels") {
+      return "Show me the channel quality scorecard";
     }
     
-    // Data-driven insights
-    if (title.includes("caribbean") && title.includes("down")) {
-      return "What's going on with Caribbean bookings?";
+    // Data-driven insights (NCL CID)
+    if (title.includes("pinterest") || title.includes("junk")) {
+      return "Which channels are generating junk traffic?";
     }
-    if (title.includes("churn")) {
-      return "Tell me about these at-risk customers";
+    if (title.includes("leakage") || title.includes("asia")) {
+      return "Tell me about the Asia/Australia leakage";
     }
-    if (title.includes("suite") || title.includes("conversion")) {
-      return "What's driving the Suite bookings increase?";
+    if (title.includes("relevance") || title.includes("aov")) {
+      return "What's the relevance premium when creative matches intent?";
     }
-    if (title.includes("reactivation") && title.includes("prospecting")) {
-      return "Tell me more about Reactivation vs Prospecting";
+    if (title.includes("hawaii") || title.includes("guardrail")) {
+      return "What's the guardrail effect for Hawaii intenders?";
     }
-    if (title.includes("revenue") && title.includes("target")) {
-      return "How are we tracking against target?";
+    if (title.includes("google") || title.includes("elite")) {
+      return "Which channels deliver the highest quality traffic?";
     }
-    if (title.includes("alaska")) {
-      return "What's happening with Alaska bookings?";
+    if (title.includes("dark") || title.includes("unclassified")) {
+      return "Tell me about the dark social problem";
     }
     
     return "Tell me more about this";
@@ -152,7 +152,7 @@ export function ChatContainer() {
   
   // Check if insight should use the API instead of pre-built response
   function shouldUseAPI(insight: Insight): boolean {
-    return insight.id === "insight-funnel" || insight.id === "insight-audience";
+    return insight.id === "insight-exotic" || insight.id === "insight-channels";
   }
 
   const handleAction = (action: ActionButton) => {
@@ -201,7 +201,10 @@ export function ChatContainer() {
               <div className="text-center space-y-2 pt-4">
                 <h2 className="text-2xl font-semibold">NaviStone Analytics Agent</h2>
                 <p className="text-muted-foreground">
-                  Ask questions about your campaign performance, customer segments, and more.
+                  Conversational analytics powered by NCL's CID, transaction, and intent data.
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  Continuously trained on your visitor sessions and booking patterns — insights improve automatically.
                 </p>
               </div>
               
